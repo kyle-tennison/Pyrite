@@ -233,8 +233,61 @@ def count_unknown(column_vector: np.ndarray) -> tuple[int, int]:
     return (knowns, unknowns)
 
 
+def display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix) -> None:
+
+    for i in range(len(total_stiffness_matrix)):
+        print("| {f:<6} |   {k:<10}  | {u:0.3e} | ".format(f=round(nodal_forces[i], 3), k=str(
+            [f'{i:0.2e}' if i < 0 else f'{i:0.3e}' for i in total_stiffness_matrix[i]]), u=nodal_displacements[i]))
+
+
+def assemble_known_and_unknown_matrices(
+        num_known_displacements, 
+        num_unknown_displacements, 
+        nodal_forces, 
+        nodal_displacements, 
+        total_stiffness_matrix
+        ) -> tuple[np.ndarray, np.ndarray]:
+    """Unknown/Known Matrices are used to solve for displacements in a 
+    linear system. They point to partitions of the total stiffness matrix.
+    This function will generate the matrix of total stiffness matrix elements
+    that correspond to unknown displacements, and it will do the same for
+    known displacements.
+    
+    Returns:
+        A tuple of (known_matrix, unknown_matrix)
+    """
+
+    # init empty matrices
+    unknown_matrix=np.empty((num_unknown_displacements, num_unknown_displacements))
+    known_matrix=np.empty((num_known_displacements, num_known_displacements))
+    local_row = 0
+
+    # iterate for each row in TSM. Filter TSM indices that correspond to a 
+    # known displacement versus the ones that correspond to an unknown displacement.
+    for tsm_row in range(len(nodal_forces)):
+        if np.isnan(nodal_forces[tsm_row]):
+            continue
+
+        
+        uk_buffer = []
+        k_buffer = []
+        for column in range(len(nodal_forces)):
+            if np.isnan(nodal_displacements[column]):
+                uk_buffer.append(total_stiffness_matrix[tsm_row, column])
+            else:
+                k_buffer.append(
+                    total_stiffness_matrix[tsm_row, column] * nodal_displacements[column])
+
+        known_matrix[local_row] = k_buffer
+        unknown_matrix[local_row] = uk_buffer
+
+        local_row += 1
+
+    return known_matrix, unknown_matrix
+
 def solve():
 
+    # Load nodes and elements
     nodes = {
         1: Node(x=0,   y=0,                          ux=None, uy=0,    Fx=0, Fy=None),
         2: Node(x=0.5, y=math.sin(math.radians(60)), ux=None, uy=None, Fx=0,    Fy=-100),
@@ -247,8 +300,10 @@ def solve():
         3: Element(nodes[1], nodes[3])
     }
 
+    # Create total stiffness matrix from nodes and elements
     total_stiffness_matrix = create_total_stiffness_matrix(nodes, elements)
 
+    # Create nodal forces/displacement vectors
     nodal_forces = calculate_force_vector(nodes)
     nodal_displacements = calculate_displacement_vector(nodes)
 
@@ -257,60 +312,43 @@ def solve():
     check_unconstrained(nodal_forces, nodal_displacements)
 
     print("The total matrix is:")
-    for i in range(DOF * len(nodes)):
-        print("| {f:<6} |   {k:<10}  | {u:<5} | ".format(f=nodal_forces[i], k=str(
-            [f'{i:0.2e}' if i < 0 else f'{i:0.3e}' for i in total_stiffness_matrix[i]]), u=nodal_displacements[i]))
+    display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix)
 
-    unknown_matrix=np.zeros((num_unknown_displacements, num_unknown_displacements))
-    known_matrix=np.zeros((num_known_displacements, num_known_displacements))
-    local_row = 0
+    # Assemble known and unknown matrices
+    known_matrix, unknown_matrix = assemble_known_and_unknown_matrices(
+        num_known_displacements,
+        num_unknown_displacements,
+        nodal_forces,
+        nodal_displacements,
+        total_stiffness_matrix
+    )
 
-    for tsm_row in range(DOF*len(nodes)):
-        print("row:", tsm_row)
-
-        if np.isnan(nodal_forces[tsm_row]):
-            continue
-
-        uk_buffer = []
-        k_buffer = []
-        for column in range(DOF*len(nodes)):
-            if np.isnan(nodal_displacements[column]):
-                uk_buffer.append(total_stiffness_matrix[tsm_row, column])
-            else:
-                k_buffer.append(
-                    total_stiffness_matrix[tsm_row, column] * nodal_displacements[column])
-
-        known_matrix[local_row] = k_buffer
-        unknown_matrix[local_row] = uk_buffer
-
-        local_row += 1
-
-
-    # known_matrix.reshape(num_known_displacements, 1)
-    # unknown_matrix.reshape(num_unknown_displacements, 1)
-
-    known_forces = np.array(
-        [i for i in nodal_forces if not np.isnan(i)]).reshape(3, 1)
-    print("known forces:\n", known_forces)
-
-    # known_matrix = np.array(known_matrix_tmp)
-    print("known matrix:\n", known_matrix)
-
-    # unknown_matrix = np.array(unknown_matrix_tmp)
-    print("unknown matrix:\n", unknown_matrix)
-
+    known_forces = np.array([i for i in nodal_forces if not np.isnan(i)]).reshape(3, 1)
     known_matrix_summed = np.array([sum(i) for i in known_matrix]).reshape((num_known_displacements,1))
-    print("known matrix summed:\n", known_matrix_summed)
+    
+    displacement_solution = np.linalg.solve(unknown_matrix, (known_forces + known_matrix_summed))
 
-    print("known forces - k:\n", known_forces + known_matrix_summed)
+    solution_cursor = 0
+    for i, u in enumerate(nodal_displacements):
+        if np.isnan(u):
+            nodal_displacements[i] = displacement_solution[solution_cursor][0]
+            solution_cursor += 1
 
-    equals = (known_forces + known_matrix_summed)
 
-    print("equals:\n", equals)
+    for i, f in enumerate(nodal_forces):
+        if np.isnan(f):
 
-    solution = np.linalg.solve(unknown_matrix, equals)
+            solved_force = 0
 
-    print("solution:\n", solution)
+            for c in range(DOF * len(nodes)):
+                solved_force += total_stiffness_matrix[i, c] * nodal_displacements[c]
+                
+
+            nodal_forces[i] = solved_force
+
+
+    print("The solved matrix is:")
+    display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix)
 
 
 if __name__ == "__main__":
