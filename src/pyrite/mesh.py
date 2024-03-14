@@ -32,9 +32,7 @@ class Mesher:
         else:
             return False
 
-    def parse_nodes(
-        self, nodes_csv: str
-    ) -> tuple[list[tuple[int, int]], list[Node]]:
+    def parse_nodes(self, nodes_csv: str) -> tuple[list[tuple[int, int]], list[Node]]:
         """Parses the nodes in a csv_file. Creates a list of node-pairs
         that can be used to build every element in the mesh.
 
@@ -52,6 +50,7 @@ class Mesher:
         with open(nodes_csv, "r") as f:
             header_skipped = False
 
+            id = 0
             for line in f.readlines():
                 if not header_skipped:
                     header_skipped = True
@@ -60,18 +59,18 @@ class Mesher:
                 items = line.split(",")
 
                 try:
-                    id = int(items[0])
-                    x = float(items[1])
-                    y = float(items[2])
-                    ux = try_float(items[3])
-                    uy = try_float(items[4])
-                    fx = try_float(items[5])
-                    fy = try_float(items[6])
+                    x = float(items[0])
+                    y = float(items[1])
+                    ux = try_float(items[2])
+                    uy = try_float(items[3])
+                    fx = try_float(items[4])
+                    fy = try_float(items[5])
                 except Exception:
                     print("Error loading nodes from nodes.csv!")
                     raise
 
                 nodes.append(Node(x, y, ux, uy, fx, fy, id))
+                id += 1
 
         points = np.empty((len(nodes), 2))
 
