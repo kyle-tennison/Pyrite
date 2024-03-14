@@ -1,4 +1,6 @@
+from typing import Optional
 from pyrite.datatypes import Node, MatrixIndex, Axis
+from pyrite.post_processor import PostProcessor
 import math
 import numpy as np
 
@@ -264,7 +266,7 @@ class Solver:
         unknown_matrix = np.empty(
             (num_unknown_displacements, num_unknown_displacements)
         )
-        known_matrix = np.empty((num_known_displacements, num_known_displacements))
+        known_matrix = np.empty((num_unknown_displacements, num_known_displacements))
         local_row = 0
 
         # iterate for each row in TSM. Filter TSM indices that correspond to a
@@ -303,6 +305,26 @@ class Solver:
             element_objects.append(Element(n1, n2))
 
         return element_objects
+    
+    @staticmethod
+    def redundant_solve(A, b) -> Optional[np.ndarray]:
+        """
+        Solves the linear system of equations Ax = b using the pseudoinverse.
+
+        Args:
+            A: The coefficient matrix
+            b: The column vector solution
+
+        Returns:
+            A numpy array representing the solution to the system, 
+            or None if the system has no solution.
+        """
+        try:
+            # Use np.linalg.solve for non-singular matrices
+            return np.linalg.solve(A, b)
+        except np.linalg.LinAlgError:
+            # If singular, use the pseudoinverse
+            return np.linalg.pinv(A) @ b
 
     def solve(
         self,
@@ -332,15 +354,22 @@ class Solver:
         )
 
         known_forces = np.array([i for i in nodal_forces if not np.isnan(i)]).reshape(
-            3, 1
+            num_unknown_displacements, 1
         )
-        known_matrix_summed = np.array([sum(i) for i in known_matrix]).reshape(
-            (num_known_displacements, 1)
-        )
+        print("known forces:\n", known_forces)
 
-        displacement_solution = np.linalg.solve(
+        known_matrix_summed = np.array([sum(i) for i in known_matrix]).reshape(
+            (num_unknown_displacements, 1)
+        )
+        print("known matrix summed:\n", known_matrix_summed)
+
+        displacement_solution = self.redundant_solve(
             unknown_matrix, (known_forces + known_matrix_summed)
         )
+
+        if displacement_solution is None:
+            raise Exception("No solution.")
+
 
         solution_cursor = 0
         for i, u in enumerate(nodal_displacements):
@@ -366,7 +395,8 @@ class Solver:
         )
 
     def run(self, nodes: list[Node], elements: list[tuple[int, int]]):
-        """Runs the FEA simulation for a set of given nodes and elements
+        """Runs the FEA simulation for a set of given nodes and elements. 
+        Runs post-processor when complete.
 
         Args:
             nodes: A list of nodes
@@ -417,4 +447,12 @@ class Solver:
             nodal_forces, nodal_displacements, total_stiffness_matrix
         )
 
-        self.solve(nodal_forces, nodal_displacements, total_stiffness_matrix)
+        try:
+            self.solve(nodal_forces, nodal_displacements, total_stiffness_matrix)
+        except Exception as e:
+            print(f"solve failed: {e}")
+            raise
+
+        post_processor = PostProcessor()
+        post_processor.output_solved(nodal_forces, nodal_displacements, nodes)
+        post_processor.show("nodes.csv")
