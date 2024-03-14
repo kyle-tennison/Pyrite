@@ -241,11 +241,11 @@ def display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matr
 
 
 def assemble_known_and_unknown_matrices(
-        num_known_displacements, 
-        num_unknown_displacements, 
-        nodal_forces, 
-        nodal_displacements, 
-        total_stiffness_matrix
+        num_known_displacements: int, 
+        num_unknown_displacements: int, 
+        nodal_forces: np.ndarray, 
+        nodal_displacements: np.ndarray, 
+        total_stiffness_matrix: np.ndarray
         ) -> tuple[np.ndarray, np.ndarray]:
     """Unknown/Known Matrices are used to solve for displacements in a 
     linear system. They point to partitions of the total stiffness matrix.
@@ -285,34 +285,17 @@ def assemble_known_and_unknown_matrices(
 
     return known_matrix, unknown_matrix
 
-def solve():
 
-    # Load nodes and elements
-    nodes = {
-        1: Node(x=0,   y=0,                          ux=None, uy=0,    Fx=0, Fy=None),
-        2: Node(x=0.5, y=math.sin(math.radians(60)), ux=None, uy=None, Fx=0,    Fy=-100),
-        3: Node(x=1,   y=0,                          ux=0,    uy=0,    Fx=None,    Fy=None),
-    }
-
-    elements = {
-        1: Element(nodes[1], nodes[2]),
-        2: Element(nodes[2], nodes[3]),
-        3: Element(nodes[1], nodes[3])
-    }
-
-    # Create total stiffness matrix from nodes and elements
-    total_stiffness_matrix = create_total_stiffness_matrix(nodes, elements)
-
-    # Create nodal forces/displacement vectors
-    nodal_forces = calculate_force_vector(nodes)
-    nodal_displacements = calculate_displacement_vector(nodes)
-
-    num_known_displacements, num_unknown_displacements = count_unknown(nodal_displacements)
+def solve(nodal_forces: np.ndarray, nodal_displacements: np.ndarray, total_stiffness_matrix: np.ndarray):
+    """Solves for unknown forces and nodal displacements.
+    
+    Returns:
+        Nothing. nodal_forces and nodal_displacements arrays will be updated
+    """
 
     check_unconstrained(nodal_forces, nodal_displacements)
 
-    print("The total matrix is:")
-    display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix)
+    num_known_displacements, num_unknown_displacements = count_unknown(nodal_displacements)
 
     # Assemble known and unknown matrices
     known_matrix, unknown_matrix = assemble_known_and_unknown_matrices(
@@ -340,7 +323,7 @@ def solve():
 
             solved_force = 0
 
-            for c in range(DOF * len(nodes)):
+            for c in range(len(total_stiffness_matrix)):
                 solved_force += total_stiffness_matrix[i, c] * nodal_displacements[c]
                 
 
@@ -350,6 +333,38 @@ def solve():
     print("The solved matrix is:")
     display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix)
 
+    
+
+def main():
+
+    # Load nodes and elements
+    nodes = {
+        1: Node(x=0,   y=0,                          ux=None, uy=0,    Fx=0, Fy=None),
+        2: Node(x=0.5, y=math.sin(math.radians(60)), ux=None, uy=None, Fx=0,    Fy=-100),
+        3: Node(x=1,   y=0,                          ux=0,    uy=0,    Fx=None,    Fy=None),
+    }
+
+    elements = {
+        1: Element(nodes[1], nodes[2]),
+        2: Element(nodes[2], nodes[3]),
+        3: Element(nodes[1], nodes[3])
+    }
+
+    # Create total stiffness matrix from nodes and elements
+    total_stiffness_matrix = create_total_stiffness_matrix(nodes, elements)
+
+    # Create nodal forces/displacement vectors
+    nodal_forces = calculate_force_vector(nodes)
+    nodal_displacements = calculate_displacement_vector(nodes)
+
+    # Display pre-solved matrix
+    print("The total matrix is:")
+    display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix)
+
+    solve(nodal_forces, nodal_displacements, total_stiffness_matrix)
+
+    
+
 
 if __name__ == "__main__":
-    solve()
+    main()
