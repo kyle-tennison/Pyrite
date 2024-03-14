@@ -8,13 +8,10 @@ class Node:
     x: float
     y: float
     ux: Optional[float]
-    Fx: Optional[float]
     uy: Optional[float]
+    Fx: Optional[float]
     Fy: Optional[float]
     id: int
-
-    def __repr__(self) -> str:
-        return f"Node({self.id})"
 
     def __eq__(self, other: "Node") -> bool:
         return self.id == other.id

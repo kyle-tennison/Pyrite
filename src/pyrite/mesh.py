@@ -13,18 +13,43 @@ def try_float(string: str):
         return float(string)
 
 
-nodes = []
-
-
 class Mesher:
 
-    def __init__(self, input_file: str):
-        self.input_file = input_file
+    def __init__(self): ...
 
-    def create_mesh(self):
+    @staticmethod
+    def _pair_equals(p1: tuple, p2: tuple) -> bool:
+        """Returns True if the paris contain the same items,
+        regardless of their order; False otherwise.
+        """
 
-        with open(self.input_file, "r") as f:
+        if p1[0] == p2[0] and p1[1] == p2[1]:
+            return True
 
+        elif p1[0] == p2[1] and p1[1] == p2[0]:
+            return True
+
+        else:
+            return False
+
+    def parse_nodes(
+        self, nodes_csv: str
+    ) -> tuple[list[tuple[int, int]], list[Node]]:
+        """Parses the nodes in a csv_file. Creates a list of node-pairs
+        that can be used to build every element in the mesh.
+
+        Args:
+            nodes_csv: The filepath to the CSV containing node definitions
+
+        Returns:
+            A list of tuples that contain the node ID to target and a list
+            of parsed nodes.
+        """
+
+        nodes: list[Node] = []
+
+        # Read CSV file, extract does
+        with open(nodes_csv, "r") as f:
             header_skipped = False
 
             for line in f.readlines():
@@ -53,33 +78,24 @@ class Mesher:
         for i, node in enumerate(nodes):
             points[i] = [node.x, node.y]
 
-        print(points)
-
         tri = Delaunay(points)
 
         elements = []
 
-        print("simplices:", tri.simplices)
-
         for simp in tri.simplices:
-            pairs = list(combinations(simp, 2))
+            pairs = combinations(simp, 2)
 
             for pair in pairs:
 
-                n1 = nodes[pair[0]]
-                n2 = nodes[pair[1]]
-                element = ElementLight(n1, n2)
+                has_match = False
+                for existing_pair in elements:
+                    if self._pair_equals(pair, existing_pair):
+                        print(f"Found duplicate: {pair} == {existing_pair}")
+                        has_match = True
 
-                if element not in elements:
-                    elements.append(element)
+                if has_match:
+                    break
                 else:
-                    print("duplicate")
-                    print(f"list: {elements}")
-                    print(f"element: {element}")
+                    elements.append(pair)
 
-        print(elements)
-
-        # import matplotlib.pyplot as plt
-        # plt.triplot(points[:,0], points[:,1], tri.simplices)
-        # plt.plot(points[:,0], points[:,1], 'o')
-        # plt.show()
+        return elements, nodes
