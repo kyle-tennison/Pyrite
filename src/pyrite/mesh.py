@@ -4,29 +4,32 @@ from scipy.spatial import Delaunay
 import numpy as np
 from itertools import combinations
 
+
 def try_float(string: str):
 
     if string.strip() == "null":
-        return None 
+        return None
     else:
         return float(string)
 
+
 nodes = []
 
+
 class Mesher:
-        
+
     def __init__(self, input_file: str):
         self.input_file = input_file
 
     def create_mesh(self):
 
-        with open(self.input_file, 'r') as f:
+        with open(self.input_file, "r") as f:
 
             header_skipped = False
 
             for line in f.readlines():
                 if not header_skipped:
-                    header_skipped = True 
+                    header_skipped = True
                     continue
 
                 items = line.split(",")
@@ -43,18 +46,7 @@ class Mesher:
                     print("Error loading nodes from nodes.csv!")
                     raise
 
-                nodes.append(
-                    Node(
-                        x,
-                        y,
-                        ux,
-                        uy,
-                        fx,
-                        fy,
-                        id
-                    )
-                )
-
+                nodes.append(Node(x, y, ux, uy, fx, fy, id))
 
         points = np.empty((len(nodes), 2))
 
@@ -65,15 +57,13 @@ class Mesher:
 
         tri = Delaunay(points)
 
-
         elements = []
 
         print("simplices:", tri.simplices)
 
-            
         for simp in tri.simplices:
-            pairs = list(combinations(simp,2)) 
-            
+            pairs = list(combinations(simp, 2))
+
             for pair in pairs:
 
                 n1 = nodes[pair[0]]
@@ -86,9 +76,8 @@ class Mesher:
                     print("duplicate")
                     print(f"list: {elements}")
                     print(f"element: {element}")
-            
-        print(elements)
 
+        print(elements)
 
         # import matplotlib.pyplot as plt
         # plt.triplot(points[:,0], points[:,1], tri.simplices)

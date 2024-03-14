@@ -3,7 +3,7 @@ import math
 import numpy as np
 
 CROSS_AREA = 10
-MATERIAL_ELASTICITY = 200E6
+MATERIAL_ELASTICITY = 200e6
 v = 0.3
 DOF = 2
 
@@ -32,27 +32,22 @@ class Element:
         dx = abs(self.n1.x - self.n2.x)
         dy = abs(self.n1.y - self.n2.y)
 
-        return math.sqrt(dx ** 2 + dy ** 2)
+        return math.sqrt(dx**2 + dy**2)
 
     @property
     def local_stiffness_matrix(self) -> np.ndarray:
         """Calculates the local stiffness matrix"""
 
         line_element_matrix = np.array(
-            [
-                [1, 0, -1, 0],
-                [0, 0, 0, 0],
-                [-1, 0, 1, 0],
-                [0, 0, 0, 0]
-            ]
+            [[1, 0, -1, 0], [0, 0, 0, 0], [-1, 0, 1, 0], [0, 0, 0, 0]]
         )
 
-        return line_element_matrix * ((MATERIAL_ELASTICITY * CROSS_AREA)/self.length)
+        return line_element_matrix * ((MATERIAL_ELASTICITY * CROSS_AREA) / self.length)
 
     @property
     def element_angle(self) -> float:
-        """Calculates the angle of the element relative to the global 
-        coordinate system. Returns a float in the interval [0, 360) """
+        """Calculates the angle of the element relative to the global
+        coordinate system. Returns a float in the interval [0, 360)"""
 
         dx = self.n1.x - self.n2.x
         dy = self.n1.y - self.n2.y
@@ -75,10 +70,12 @@ class Element:
         # print(((MATERIAL_ELASTICITY * CROSS_AREA)/self.length))
 
         return np.array(
-            [[C ** 2, C*S, - C**2, -C*S],
-             [C*S, S**2, -C*S, -S**2],
-             [-C**2, -C*S, C**2, C*S],
-             [-C*S, -S**2, C*S, S**2]]
+            [
+                [C**2, C * S, -(C**2), -C * S],
+                [C * S, S**2, -C * S, -(S**2)],
+                [-(C**2), -C * S, C**2, C * S],
+                [-C * S, -(S**2), C * S, S**2],
+            ]
         )
 
     def _calculate_global_stiffness_matrix(self) -> np.ndarray:
@@ -99,7 +96,9 @@ class Element:
         ]
 
         # return self.transition_matrix  # TODO <-- Delete
-        return self.transition_matrix * ((MATERIAL_ELASTICITY * CROSS_AREA)/self.length)
+        return self.transition_matrix * (
+            (MATERIAL_ELASTICITY * CROSS_AREA) / self.length
+        )
 
     @property
     def global_stiffness_matrix(self) -> np.ndarray:
@@ -116,11 +115,12 @@ class Element:
 
         if row in self.row_indexes and column in self.column_indexes:
 
-            return self.global_stiffness_matrix[self.row_indexes.index(row), self.column_indexes.index(column)]
+            return self.global_stiffness_matrix[
+                self.row_indexes.index(row), self.column_indexes.index(column)
+            ]
 
         else:
             return 0
-
 
 
 class Solver:
@@ -128,13 +128,13 @@ class Solver:
     def __init__(self):
         self.nodes: list[Node] = []
         self.elements: list[Element] = []
-        self.matrix_size = DOF * len(self.nodes) 
-    
+        self.matrix_size = DOF * len(self.nodes)
+
     def create_total_stiffness_matrix(self, nodes, elements) -> np.ndarray:
         """Creates a total stiffness matrix from each global stiffness
         matrix on each element.
-        
-        Returns:   
+
+        Returns:
             A 2D matrix containing the matrix"""
 
         total_stiffness_matrix = np.zeros((DOF * len(nodes), DOF * len(nodes)))
@@ -167,7 +167,6 @@ class Solver:
 
         return total_stiffness_matrix
 
-
     def calculate_force_vector(self, nodes: dict[int, Node]) -> np.ndarray:
         """Calculates column vector of forces."""
         F = np.zeros((len(nodes) * DOF))
@@ -179,7 +178,6 @@ class Solver:
             i += 2
 
         return F
-
 
     def calculate_displacement_vector(self, nodes: dict[int, Node]) -> np.ndarray:
         """Calculates column vector of displacements."""
@@ -193,7 +191,6 @@ class Solver:
 
         return U
 
-
     def check_unconstrained(self, f: np.ndarray, u: np.ndarray) -> None:
         """Raises an error if the model is over or under constrained"""
 
@@ -204,10 +201,9 @@ class Solver:
             if (not np.isnan(f[i])) and (not np.isnan(u[i])):
                 raise Exception(f"Model Overconstrained at index {i}")
 
-
     def count_unknown(self, column_vector: np.ndarray) -> tuple[int, int]:
         """Counts the number of NaN values in a vector.
-        
+
         Returns:
             Tuple of (# known, # unknown)
         """
@@ -221,44 +217,55 @@ class Solver:
 
         return (knowns, unknowns)
 
-
-    def display_total_matrix(self, nodal_forces, nodal_displacements, total_stiffness_matrix) -> None:
+    def display_total_matrix(
+        self, nodal_forces, nodal_displacements, total_stiffness_matrix
+    ) -> None:
 
         for i in range(len(total_stiffness_matrix)):
-            print("| {f:<6} |   {k:<10}  | {u:0.3e} | ".format(f=round(nodal_forces[i], 3), k=str(
-                [f'{i:0.2e}' if i < 0 else f'{i:0.3e}' for i in total_stiffness_matrix[i]]), u=nodal_displacements[i]))
-
+            print(
+                "| {f:<6} |   {k:<10}  | {u:0.3e} | ".format(
+                    f=round(nodal_forces[i], 3),
+                    k=str(
+                        [
+                            f"{i:0.2e}" if i < 0 else f"{i:0.3e}"
+                            for i in total_stiffness_matrix[i]
+                        ]
+                    ),
+                    u=nodal_displacements[i],
+                )
+            )
 
     def assemble_known_and_unknown_matrices(
-            self,
-            num_known_displacements: int, 
-            num_unknown_displacements: int, 
-            nodal_forces: np.ndarray, 
-            nodal_displacements: np.ndarray, 
-            total_stiffness_matrix: np.ndarray
-            ) -> tuple[np.ndarray, np.ndarray]:
-        """Unknown/Known Matrices are used to solve for displacements in a 
+        self,
+        num_known_displacements: int,
+        num_unknown_displacements: int,
+        nodal_forces: np.ndarray,
+        nodal_displacements: np.ndarray,
+        total_stiffness_matrix: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Unknown/Known Matrices are used to solve for displacements in a
         linear system. They point to partitions of the total stiffness matrix.
         This function will generate the matrix of total stiffness matrix elements
         that correspond to unknown displacements, and it will do the same for
         known displacements.
-        
+
         Returns:
             A tuple of (known_matrix, unknown_matrix)
         """
 
         # init empty matrices
-        unknown_matrix=np.empty((num_unknown_displacements, num_unknown_displacements))
-        known_matrix=np.empty((num_known_displacements, num_known_displacements))
+        unknown_matrix = np.empty(
+            (num_unknown_displacements, num_unknown_displacements)
+        )
+        known_matrix = np.empty((num_known_displacements, num_known_displacements))
         local_row = 0
 
-        # iterate for each row in TSM. Filter TSM indices that correspond to a 
+        # iterate for each row in TSM. Filter TSM indices that correspond to a
         # known displacement versus the ones that correspond to an unknown displacement.
         for tsm_row in range(len(nodal_forces)):
             if np.isnan(nodal_forces[tsm_row]):
                 continue
 
-            
             uk_buffer = []
             k_buffer = []
             for column in range(len(nodal_forces)):
@@ -266,7 +273,9 @@ class Solver:
                     uk_buffer.append(total_stiffness_matrix[tsm_row, column])
                 else:
                     k_buffer.append(
-                        total_stiffness_matrix[tsm_row, column] * nodal_displacements[column])
+                        total_stiffness_matrix[tsm_row, column]
+                        * nodal_displacements[column]
+                    )
 
             known_matrix[local_row] = k_buffer
             unknown_matrix[local_row] = uk_buffer
@@ -275,17 +284,23 @@ class Solver:
 
         return known_matrix, unknown_matrix
 
-
-    def solve(self, nodal_forces: np.ndarray, nodal_displacements: np.ndarray, total_stiffness_matrix: np.ndarray):
+    def solve(
+        self,
+        nodal_forces: np.ndarray,
+        nodal_displacements: np.ndarray,
+        total_stiffness_matrix: np.ndarray,
+    ):
         """Solves for unknown forces and nodal displacements.
-        
+
         Returns:
             Nothing. nodal_forces and nodal_displacements arrays will be updated
         """
 
         self.check_unconstrained(nodal_forces, nodal_displacements)
 
-        num_known_displacements, num_unknown_displacements = self.count_unknown(nodal_displacements)
+        num_known_displacements, num_unknown_displacements = self.count_unknown(
+            nodal_displacements
+        )
 
         # Assemble known and unknown matrices
         known_matrix, unknown_matrix = self.assemble_known_and_unknown_matrices(
@@ -293,13 +308,19 @@ class Solver:
             num_unknown_displacements,
             nodal_forces,
             nodal_displacements,
-            total_stiffness_matrix
+            total_stiffness_matrix,
         )
 
-        known_forces = np.array([i for i in nodal_forces if not np.isnan(i)]).reshape(3, 1)
-        known_matrix_summed = np.array([sum(i) for i in known_matrix]).reshape((num_known_displacements,1))
-        
-        displacement_solution = np.linalg.solve(unknown_matrix, (known_forces + known_matrix_summed))
+        known_forces = np.array([i for i in nodal_forces if not np.isnan(i)]).reshape(
+            3, 1
+        )
+        known_matrix_summed = np.array([sum(i) for i in known_matrix]).reshape(
+            (num_known_displacements, 1)
+        )
+
+        displacement_solution = np.linalg.solve(
+            unknown_matrix, (known_forces + known_matrix_summed)
+        )
 
         solution_cursor = 0
         for i, u in enumerate(nodal_displacements):
@@ -307,37 +328,44 @@ class Solver:
                 nodal_displacements[i] = displacement_solution[solution_cursor][0]
                 solution_cursor += 1
 
-
         for i, f in enumerate(nodal_forces):
             if np.isnan(f):
 
                 solved_force = 0
 
                 for c in range(len(total_stiffness_matrix)):
-                    solved_force += total_stiffness_matrix[i, c] * nodal_displacements[c]
-                    
+                    solved_force += (
+                        total_stiffness_matrix[i, c] * nodal_displacements[c]
+                    )
 
                 nodal_forces[i] = solved_force
 
-
         print("The solved matrix is:")
-        self.display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix)
-
-        
+        self.display_total_matrix(
+            nodal_forces, nodal_displacements, total_stiffness_matrix
+        )
 
     def run(self):
 
         # Load nodes and elements
         nodes = {
-            1: Node(x=0,   y=0,                          ux=None, uy=0,    Fx=0, Fy=None, id=1),
-            2: Node(x=0.5, y=math.sin(math.radians(60)), ux=None, uy=None, Fx=0,    Fy=-100,id=2),
-            3: Node(x=1,   y=0,                          ux=0,    uy=0,    Fx=None,    Fy=None,id=3),
+            1: Node(x=0, y=0, ux=None, uy=0, Fx=0, Fy=None, id=1),
+            2: Node(
+                x=0.5,
+                y=math.sin(math.radians(60)),
+                ux=None,
+                uy=None,
+                Fx=0,
+                Fy=-100,
+                id=2,
+            ),
+            3: Node(x=1, y=0, ux=0, uy=0, Fx=None, Fy=None, id=3),
         }
 
         elements = {
             1: Element(nodes[1], nodes[2]),
             2: Element(nodes[2], nodes[3]),
-            3: Element(nodes[1], nodes[3])
+            3: Element(nodes[1], nodes[3]),
         }
 
         # Create total stiffness matrix from nodes and elements
@@ -349,7 +377,8 @@ class Solver:
 
         # Display pre-solved matrix
         print("The total matrix is:")
-        self.display_total_matrix(nodal_forces, nodal_displacements, total_stiffness_matrix)
+        self.display_total_matrix(
+            nodal_forces, nodal_displacements, total_stiffness_matrix
+        )
 
         self.solve(nodal_forces, nodal_displacements, total_stiffness_matrix)
-

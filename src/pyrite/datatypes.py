@@ -15,14 +15,14 @@ class Node:
 
     def __repr__(self) -> str:
         return f"Node({self.id})"
-    
-    def __eq__(self, other: 'Node') -> bool:
+
+    def __eq__(self, other: "Node") -> bool:
         return self.id == other.id
 
 
 class Axis(Enum):
-    X = 'X'
-    Y = 'Y'
+    X = "X"
+    Y = "Y"
 
 
 @dataclass
@@ -30,7 +30,8 @@ class MatrixIndex:
     node: Node
     axis: Axis
 
+
 @dataclass
 class ElementLight:
-    n1: Node 
-    n2: Node 
+    n1: Node
+    n2: Node
