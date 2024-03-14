@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyrite"
+description = "A 2D Finite Element Solver in Python"
+requires-python = ">=3.12,<4"
+version = "0.0.1"
+
+[[project.authors]]
+name = "Kyle Tennison"
+email = "kyletennison05@gmail.com"

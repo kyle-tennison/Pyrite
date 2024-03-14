@@ -1,4 +1,4 @@
-from datatypes import Node, ElementLight
+from pyrite.datatypes import Node, ElementLight
 
 from scipy.spatial import Delaunay
 import numpy as np
@@ -12,6 +12,7 @@ def try_float(string: str):
         return float(string)
 
 nodes = []
+
 
 with open("nodes.csv", 'r') as f:
 

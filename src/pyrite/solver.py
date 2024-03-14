@@ -1,4 +1,4 @@
-from datatypes import Node, MatrixIndex, Axis
+from pyrite.datatypes import Node, MatrixIndex, Axis
 import math
 import numpy as np
 
