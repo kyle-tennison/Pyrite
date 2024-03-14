@@ -213,6 +213,7 @@ class Solver:
         except np.linalg.LinAlgError:
             # If singular, use the pseudoinverse
             return np.linalg.pinv(A) @ b
+        
 
     def solve(
         self,
@@ -333,12 +334,17 @@ class Solver:
             nodal_forces, nodal_displacements, total_stiffness_matrix
         )
 
+        # Solve matrix
         try:
             self.solve(nodal_forces, nodal_displacements, total_stiffness_matrix)
         except Exception as e:
             print(f"solve failed: {e}")
             raise
 
+        # Load nodal displacements into each element object
+
         post_processor = PostProcessor()
+        post_processor.load_displacements_into_elements(nodal_displacements, self.elements)
+        post_processor.compute_strain(self.elements)
         post_processor.output_solved(nodal_forces, nodal_displacements, nodes)
-        post_processor.show("nodes.csv")
+        post_processor.show("nodes.csv", self.elements)

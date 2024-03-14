@@ -48,10 +48,16 @@ class Element:
         self.n1: Node = n1
         self.n2: Node = n2
 
+        self.n1_u = (0.0, 0.0)
+        self.n2_u = (0.0, 0.0)
+
         self._global_stiffness_matrix = None
 
         self.row_indexes = []
         self.column_indexes = []
+
+        self._normal_stress = 0.0
+        self._normal_strain = 0.0
 
     @property
     def length(self) -> float:
@@ -149,3 +155,30 @@ class Element:
 
         else:
             return 0
+        
+    @property 
+    def normal_strain(self) -> float:
+        """Returns the normal strain of the element. This is usually 
+        set after solving by the post-processor.
+        """
+        return self._normal_strain
+    
+    @normal_strain.setter
+    def normal_strain(self, value: float) -> None:
+        """Sets the normal strain in the element. This should only be
+        set by the post-processor.
+        """
+
+        self._normal_strain = value
+
+
+    @property 
+    def normal_stress(self) -> float:
+        """Returns the average stress from the calculated strain. Note, 
+        if the strain attribute was not set, this will default to zero.
+        
+        Returns:
+            The stress, in whichever unit MATERIAL_ELASTICITY is set.
+        """
+
+        return MATERIAL_ELASTICITY * self.normal_strain
