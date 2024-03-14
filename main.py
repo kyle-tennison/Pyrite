@@ -1,8 +1,5 @@
-from copy import deepcopy
-from dataclasses import dataclass
-from enum import Enum
+from datatypes import Node, MatrixIndex, Axis
 import math
-from typing import Optional
 import numpy as np
 
 CROSS_AREA = 10
@@ -15,27 +12,6 @@ def magnitude(vector: np.ndarray) -> float:
     """Calculates the magnitude of a np array"""
 
     return math.sqrt(vector[0] ** 2 + vector[1] ** 2)
-
-
-@dataclass
-class Node:
-    x: float
-    y: float
-    ux: Optional[float]
-    Fx: Optional[float]
-    uy: Optional[float]
-    Fy: Optional[float]
-
-
-class Axis(Enum):
-    X = 'X'
-    Y = 'Y'
-
-
-@dataclass
-class MatrixIndex:
-    node: Node
-    axis: Axis
 
 
 class Element:
