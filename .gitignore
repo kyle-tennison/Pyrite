@@ -1,1 +1,5 @@
 .vscode/settings.json
+src/pyrite/__pycache__/__init__.cpython-312.pyc
+src/pyrite/__pycache__/datatypes.cpython-312.pyc
+src/pyrite/__pycache__/mesh.cpython-312.pyc
+src/pyrite/__pycache__/solver.cpython-312.pyc

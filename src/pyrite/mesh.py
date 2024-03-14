@@ -13,75 +13,84 @@ def try_float(string: str):
 
 nodes = []
 
+class Mesher:
+        
+    def __init__(self, input_file: str):
+        self.input_file = input_file
 
-with open("nodes.csv", 'r') as f:
+    def create_mesh(self):
 
-    header_skipped = False
+        with open(self.input_file, 'r') as f:
 
-    for line in f.readlines():
-        if not header_skipped:
-            header_skipped = True 
-            continue
+            header_skipped = False
 
-        items = line.split(",")
+            for line in f.readlines():
+                if not header_skipped:
+                    header_skipped = True 
+                    continue
 
-        try:
-            id = int(items[0])
-            x = float(items[1])
-            y = float(items[2])
-            ux = try_float(items[3])
-            uy = try_float(items[4])
-            fx = try_float(items[5])
-            fy = try_float(items[6])
-        except Exception:
-            print("Error loading nodes from nodes.csv!")
-            raise
+                items = line.split(",")
 
-        nodes.append(
-            Node(
-                x,
-                y,
-                ux,
-                uy,
-                fx,
-                fy,
-            )
-        )
+                try:
+                    id = int(items[0])
+                    x = float(items[1])
+                    y = float(items[2])
+                    ux = try_float(items[3])
+                    uy = try_float(items[4])
+                    fx = try_float(items[5])
+                    fy = try_float(items[6])
+                except Exception:
+                    print("Error loading nodes from nodes.csv!")
+                    raise
 
-
-points = np.empty((len(nodes), 2))
-
-for i, node in enumerate(nodes):
-    points[i] = [node.x, node.y]
-
-print(points)
-
-tri = Delaunay(points)
+                nodes.append(
+                    Node(
+                        x,
+                        y,
+                        ux,
+                        uy,
+                        fx,
+                        fy,
+                        id
+                    )
+                )
 
 
-elements = []
+        points = np.empty((len(nodes), 2))
 
-print("simplices:", tri.simplices)
+        for i, node in enumerate(nodes):
+            points[i] = [node.x, node.y]
 
-    
-for simp in tri.simplices:
-    pairs = list(combinations(simp,2)) 
-    
-    for pair in pairs:
+        print(points)
 
-        n1 = nodes[pair[0]]
-        n2 = nodes[pair[1]]
-        element = ElementLight(n1, n2)
-
-        if element not in elements:
-            elements.append(element)
-        else:
-            print("duplicate")
-    
-print(elements)
+        tri = Delaunay(points)
 
 
-import matplotlib.pyplot as plt
-plt.triplot(points[:,0], points[:,1], tri.simplices)
-plt.plot(points[:,0], points[:,1], 'o')
-plt.show()
+        elements = []
+
+        print("simplices:", tri.simplices)
+
+            
+        for simp in tri.simplices:
+            pairs = list(combinations(simp,2)) 
+            
+            for pair in pairs:
+
+                n1 = nodes[pair[0]]
+                n2 = nodes[pair[1]]
+                element = ElementLight(n1, n2)
+
+                if element not in elements:
+                    elements.append(element)
+                else:
+                    print("duplicate")
+                    print(f"list: {elements}")
+                    print(f"element: {element}")
+            
+        print(elements)
+
+
+        # import matplotlib.pyplot as plt
+        # plt.triplot(points[:,0], points[:,1], tri.simplices)
+        # plt.plot(points[:,0], points[:,1], 'o')
+        # plt.show()

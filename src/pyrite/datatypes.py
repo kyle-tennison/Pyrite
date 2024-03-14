@@ -11,6 +11,13 @@ class Node:
     Fx: Optional[float]
     uy: Optional[float]
     Fy: Optional[float]
+    id: int
+
+    def __repr__(self) -> str:
+        return f"Node({self.id})"
+    
+    def __eq__(self, other: 'Node') -> bool:
+        return self.id == other.id
 
 
 class Axis(Enum):
@@ -27,15 +34,3 @@ class MatrixIndex:
 class ElementLight:
     n1: Node 
     n2: Node 
-
-    def __eq__(self, other: 'ElementLight'):
-        
-        match = False 
-
-        if self.n1 == other.n1 and self.n2 == other.n2:
-            match = True 
-
-        if self.n1 == other.n2 and self.n2 == other.n1:
-            match = True 
-
-        return True
