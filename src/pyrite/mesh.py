@@ -12,89 +12,85 @@ def try_float(string: str):
     else:
         return float(string)
 
+class Mesh:
+
+    def __init__(self, vertices: np.ndarray):
+        self.vertices = vertices
 
 class Mesher:
 
     def __init__(self): ...
 
-    @staticmethod
-    def _pair_equals(p1: tuple, p2: tuple) -> bool:
-        """Returns True if the paris contain the same items,
-        regardless of their order; False otherwise.
-        """
-
-        if p1[0] == p2[0] and p1[1] == p2[1]:
-            return True
-
-        elif p1[0] == p2[1] and p1[1] == p2[0]:
-            return True
-
-        else:
-            return False
-
-    def parse_nodes(self, nodes_csv: str) -> tuple[list[tuple[int, int]], list[Node]]:
-        """Parses the nodes in a csv_file. Creates a list of node-pairs
-        that can be used to build every element in the mesh.
-
+    def generate_geo(self, outer_vertices: list[tuple]):
+        """Generates a .geo file from a list of vertices.
+        
         Args:
-            nodes_csv: The filepath to the CSV containing node definitions
-
-        Returns:
-            A list of tuples that contain the node ID to target and a list
-            of parsed nodes.
+            outer_vertices: the ordered list of vertices to generate the 
+                outermost surface boundary.
+        
         """
 
-        nodes: list[Node] = []
+        ELEMENT_ORDER = 1
+        ALGORITHM = 1 # delaunay
+        CHARACTERISTIC_LENGTH_MAX = 1 # min element size
+        CHARACTERISTIC_LENGTH_MIN = 5 # max element size
 
-        # Read CSV file, extract does
-        with open(nodes_csv, "r") as f:
-            header_skipped = False
+        with open("geom.geo", "w") as f:
 
-            id = 0
-            for line in f.readlines():
-                if not header_skipped:
-                    header_skipped = True
-                    continue
 
-                items = line.split(",")
+            # define points
+            f.write("// Define Points\n")
+            for i, vertex in enumerate(outer_vertices):
+                x = vertex[0]
+                y = vertex[1]
 
-                try:
-                    x = float(items[0])
-                    y = float(items[1])
-                    ux = try_float(items[2])
-                    uy = try_float(items[3])
-                    fx = try_float(items[4])
-                    fy = try_float(items[5])
-                except Exception:
-                    print("Error loading nodes from nodes.csv!")
-                    raise
+                f.write(f"Point({i}) = {{{x}, {y}, 0, 1.0}};\n")
 
-                nodes.append(Node(x, y, ux, uy, fx, fy, id))
-                id += 1
+            # connect points
+            f.write("\n\n// Connect Points\n")
+            for i in range(1, len(outer_vertices)):
+                f.write(f"Line({i-1}) = {{{i-1}, {i}}};\n")
+            f.write(f"Line({len(outer_vertices)-1}) = {{{len(outer_vertices)-1}, 0}};\n")
 
-        points = np.empty((len(nodes), 2))
+            # define outer loop
+            f.write("\n\n// Register outer loop\n")
+            f.write("Line Loop(1) = {")
+            for i in range(len(outer_vertices)):
+                f.write(("," if i!=0 else "") + f"{i}")
+            f.write("};\n")
+            f.write("Plane Surface(1) = {1};")
 
-        for i, node in enumerate(nodes):
-            points[i] = [node.x, node.y]
+            # define meshing settings
+            f.write("\n\n// Define Mesh Settings\n")
+            f.write(f"Mesh.ElementOrder = {ELEMENT_ORDER};\n")
+            f.write(f"Mesh.Algorithm = {ALGORITHM};\n")
+            f.write(f"Mesh.CharacteristicLengthMax = {CHARACTERISTIC_LENGTH_MAX};\n")
+            f.write(f"Mesh.CharacteristicLengthMin = {CHARACTERISTIC_LENGTH_MIN};\n")
+            f.write(f"Mesh 2;\n")
 
-        tri = Delaunay(points)
+            
 
-        elements = []
+    def parse_csv(self, input_file: str):
+        """Parses input CSV that contains vertices"""
 
-        for simp in tri.simplices:
-            pairs = combinations(simp, 2)
+        vertices = []
 
-            for pair in pairs:
+        with open(input_file, 'r') as f:
 
-                has_match = False
-                for existing_pair in elements:
-                    if self._pair_equals(pair, existing_pair):
-                        print(f"Found duplicate: {pair} == {existing_pair}")
-                        has_match = True
+            headers = [i.strip() for i in f.readline().split(",")]
 
-                if has_match:
-                    break
-                else:
-                    elements.append(pair)
+            for line in [i.split(",") for i in f.readlines()]:
 
-        return elements, nodes
+                x = float(line[headers.index("x")])
+                y = float(line[headers.index("y")])
+                ux = try_float(line[headers.index("ux")])
+                uy = try_float(line[headers.index("uy")])
+                fx = try_float(line[headers.index("fx")])
+                fy = try_float(line[headers.index("fy")])
+
+                vertices.append(
+                    (x,y,ux,uy,fx,fy)
+                )
+
+        self.generate_geo(vertices)
+
