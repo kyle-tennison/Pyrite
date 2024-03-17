@@ -1,8 +1,9 @@
 import math
 
 from matplotlib.colors import rgb2hex
-from pyrite.datatypes import Node, Element
+from pyrite.datatypes import Node
 from pyrite.mesh import try_float
+from pyrite.element import Element
 
 import numpy as np
 import csv
@@ -14,7 +15,9 @@ import matplotlib.pyplot as plt
 class PostProcessor:
 
     @staticmethod
-    def load_displacements_into_elements(nodal_displacements: np.ndarray, elements: list[Element]):
+    def load_displacements_into_elements(
+        nodal_displacements: np.ndarray, elements: list[Element]
+    ):
         """Loads the nodal displacements into each element object"""
 
         for element in elements:
@@ -36,8 +39,8 @@ class PostProcessor:
             n1_ux, n1_uy = element.n1_u
             n2_ux, n2_uy = element.n2_u
 
-            dx = n1_ux + n2_ux 
-            dy = n1_uy + n2_uy 
+            dx = n1_ux + n2_ux
+            dy = n1_uy + n2_uy
 
             d = math.sqrt(dx**2 + dy**2)
 
@@ -47,7 +50,7 @@ class PostProcessor:
     def color_gradient(min_value: float, max_value: float, value: float) -> str:
         """Computes a color for a given value within an interval. Low will be
         blue, high will be red.
-        
+
         Args:
             value: The value to convert to a color (float).
             min_value: The minimum value in the range (float).
@@ -62,28 +65,29 @@ class PostProcessor:
         red = 0.0
 
         if norm_value > 0.5:
-            blue = 2*(norm_value-0.5)
-        
-        else:
-            red = 2*norm_value
+            blue = 2 * (norm_value - 0.5)
 
+        else:
+            red = 2 * norm_value
 
         # Combine RGB values into a hex string
-        color= '#%02x%02x%02x' % (int(255*red), 0, int(255*blue))
+        color = "#%02x%02x%02x" % (int(255 * red), 0, int(255 * blue))
 
-        print(f"max: {max_value}, min: {min_value}, value: {value}, red: {red}, blue:{blue} norm: {norm_value}")
+        print(
+            f"max: {max_value}, min: {min_value}, value: {value}, red: {red}, blue:{blue} norm: {norm_value}"
+        )
 
         return color
-    
+
     @staticmethod
     def find_max_stresses(elements: list[Element]) -> tuple[float, float]:
         """Searches for the highest and lowest stresses in a list
         of elements. Note, the elements must have stresses computed
         before calling this function.
-        
+
         Args:
             elements: A list of Element objects
-        
+
         Returns:
             A tuple of (min, max) floats representing the min & max
                 stresses
@@ -93,7 +97,7 @@ class PostProcessor:
         max = 0.0
 
         for element in elements:
-            
+
             if element.normal_stress > max:
                 max = element.normal_stress
 
@@ -168,10 +172,9 @@ class PostProcessor:
             begin_points[:, 0], begin_points[:, 1], tri_begin.simplices
         )
 
-       
         min_stress, max_stress = self.find_max_stresses(elements)
 
-       # Draw deformed results with stress colors
+        # Draw deformed results with stress colors
         for element in elements:
 
             x = np.empty(2)
@@ -189,8 +192,6 @@ class PostProcessor:
 
             solved_plot.plot(x, y, color=color)
 
-
-       
         # Adjust axes to be equal to each other, and to fit each other
         if not (solved_plot.get_xlim() > initial_plot.get_xlim()):
             print("1")

@@ -1,4 +1,5 @@
-from pyrite.datatypes import Node, MatrixIndex, Axis, DOF, Element
+from pyrite.datatypes import Node, MatrixIndex, Axis, DOF
+from pyrite.element import Element
 from pyrite.post_processor import PostProcessor
 
 
@@ -213,7 +214,6 @@ class Solver:
         except np.linalg.LinAlgError:
             # If singular, use the pseudoinverse
             return np.linalg.pinv(A) @ b
-        
 
     def solve(
         self,
@@ -344,7 +344,9 @@ class Solver:
         # Load nodal displacements into each element object
 
         post_processor = PostProcessor()
-        post_processor.load_displacements_into_elements(nodal_displacements, self.elements)
+        post_processor.load_displacements_into_elements(
+            nodal_displacements, self.elements
+        )
         post_processor.compute_strain(self.elements)
         post_processor.output_solved(nodal_forces, nodal_displacements, nodes)
         post_processor.show("nodes.csv", self.elements)
