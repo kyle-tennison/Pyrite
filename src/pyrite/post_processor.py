@@ -1,7 +1,8 @@
 import math
 
 from matplotlib.colors import rgb2hex
-from pyrite.datatypes import Node
+from matplotlib.patches import Polygon
+from pyrite.datatypes import Node, DOF
 from pyrite.mesh import try_float
 from pyrite.element import Element
 
@@ -27,24 +28,35 @@ class PostProcessor:
             n2_ux = nodal_displacements[2 * element.n2.index]
             n2_uy = nodal_displacements[2 * element.n2.index + 1]
 
+            n3_ux = nodal_displacements[2 * element.n3.index]
+            n3_uy = nodal_displacements[2 * element.n3.index + 1]
+
             element.n1_u = (n1_ux, n1_uy)
             element.n2_u = (n2_ux, n2_uy)
+            element.n3_u = (n3_ux, n3_uy)
 
-    def compute_strain(self, elements: list[Element]):
-        """Computes the strain from the solved nodal displacements and
-        loads into element."""
+    def compute_stress(self, elements: list[Element]):
+        """Computes the stress from the solved nodal displacements and
+        loads into element. This means load_displacements_into_elements
+        must be called first.
+        """
 
         for element in elements:
 
-            n1_ux, n1_uy = element.n1_u
-            n2_ux, n2_uy = element.n2_u
+            nodal_displacements = np.array(
+                [element.n1_u, element.n2_u, element.n3_u]
+            ).reshape(3 * DOF, 1)
 
-            dx = n1_ux + n2_ux
-            dy = n1_uy + n2_uy
+            stress = (
+                element.stress_strain_matrix
+                @ element.strain_displacement_matrix
+                @ nodal_displacements
+            ).flatten()
 
-            d = math.sqrt(dx**2 + dy**2)
+            sigma_x = stress[0]
+            sigma_y = stress[1]
 
-            element.normal_strain = d / element.length
+            element.stress = math.sqrt(sigma_x**2 + sigma_y**2)
 
     @staticmethod
     def color_gradient(min_value: float, max_value: float, value: float) -> str:
@@ -65,17 +77,13 @@ class PostProcessor:
         red = 0.0
 
         if norm_value > 0.5:
-            blue = 2 * (norm_value - 0.5)
+            red = 2 * (norm_value - 0.5)
 
         else:
-            red = 2 * norm_value
+            blue = 2 * norm_value
 
         # Combine RGB values into a hex string
         color = "#%02x%02x%02x" % (int(255 * red), 0, int(255 * blue))
-
-        print(
-            f"max: {max_value}, min: {min_value}, value: {value}, red: {red}, blue:{blue} norm: {norm_value}"
-        )
 
         return color
 
@@ -98,11 +106,11 @@ class PostProcessor:
 
         for element in elements:
 
-            if element.normal_stress > max:
-                max = element.normal_stress
+            if element.stress > max:
+                max = element.stress
 
-            elif element.normal_strain < min:
-                min = element.normal_stress
+            elif element.stress < min:
+                min = element.stress
 
         return (min, max)
 
@@ -133,6 +141,10 @@ class PostProcessor:
     def show(self, input_file: str, elements: list[Element]):
         """Shows post-processed results"""
 
+        plt.style.use("seaborn-v0_8")
+
+        self.compute_stress(elements)
+
         # Setup plot
         fig, axs = plt.subplots(2)
         fig.suptitle("Simulation Results")
@@ -140,71 +152,77 @@ class PostProcessor:
         solved_plot = axs[0]
         initial_plot = axs[1]
 
-        # Read input csv and plot initial results
-        begin_points = []
-        with open(input_file, "r") as f:
-            header_skipped = False
+        # Show initial plot
+        triangles = np.empty((len(elements), 3, 2))
 
-            for line in f.readlines():
-                if not header_skipped:
-                    header_skipped = True
-                    continue
+        for i, element in enumerate(elements):
 
-                items = line.split(",")
+            n1 = element.n1
+            n2 = element.n2
+            n3 = element.n3
+            triangles[i, 0] = (n1.x, n1.y)
+            triangles[i, 1] = (n2.x, n2.y)
+            triangles[i, 2] = (n3.x, n3.y)
 
-                x = float(items[0])
-                y = float(items[1])
-                ux = try_float(items[2])
-                uy = try_float(items[3])
+        for triangle in triangles:
 
-                if ux is None:
-                    ux = 0
-                if uy is None:
-                    uy = 0
+            polygon = Polygon(
+                triangle, closed=True, edgecolor="black", linewidth=0.2, alpha=0.7
+            )
 
-                begin_points.append((x + ux, y + uy))
+            polygon.set_facecolor((0.3, 0.3, 0.3))
 
-        begin_points = np.array(begin_points)
-        tri_begin = Delaunay(begin_points)
+            initial_plot.add_patch(polygon)
 
-        initial_plot.set_title("Initial Model:")
-        initial_plot.triplot(
-            begin_points[:, 0], begin_points[:, 1], tri_begin.simplices
-        )
+        initial_plot.set_title("Initial Model")
+
+        # Show final plot
+        triangles = np.empty((len(elements), 3, 2))
+        triangle_colormap: list[str] = []
 
         min_stress, max_stress = self.find_max_stresses(elements)
 
-        # Draw deformed results with stress colors
-        for element in elements:
+        for i, element in enumerate(elements):
 
-            x = np.empty(2)
-            y = np.empty(2)
+            n1 = element.n1
+            n2 = element.n2
+            n3 = element.n3
 
-            x[0] = element.n1.x + element.n1_u[0]
-            x[1] = element.n2.x + element.n2_u[0]
+            n1_ux, n1_uy = element.n1_u
+            n2_ux, n2_uy = element.n2_u
+            n3_ux, n3_uy = element.n3_u
 
-            y[0] = element.n1.y + element.n1_u[1]
-            y[1] = element.n2.y + element.n2_u[1]
+            triangles[i, 0] = (n1.x + n1_ux, n1.y + n1_uy)
+            triangles[i, 1] = (n2.x + n2_ux, n2.y + n2_uy)
+            triangles[i, 2] = (n3.x + n3_ux, n3.y + n3_uy)
 
-            color = self.color_gradient(min_stress, max_stress, element.normal_stress)
+            color = self.color_gradient(min_stress, max_stress, element.stress)
+            triangle_colormap.append(color)
 
-            print("color is:", color)
+        for i, triangle in enumerate(triangles):
 
-            solved_plot.plot(x, y, color=color)
+            polygon = Polygon(
+                triangle, closed=True, edgecolor="black", linewidth=0.2, alpha=0.7
+            )
+
+            polygon.set_facecolor(triangle_colormap[i])
+
+            solved_plot.add_patch(polygon)
+
+        solved_plot.set_title("Solved Model")
+
+        solved_plot.autoscale()
+        initial_plot.autoscale()
 
         # Adjust axes to be equal to each other, and to fit each other
         if not (solved_plot.get_xlim() > initial_plot.get_xlim()):
-            print("1")
             initial_plot.set_xlim(solved_plot.get_xlim())
         else:
-            print("2")
             solved_plot.set_xlim(initial_plot.get_xlim())
 
         if not (solved_plot.get_ylim() > initial_plot.get_ylim()):
-            print("3")
             initial_plot.set_ylim(solved_plot.get_ylim())
         else:
-            print("4")
             solved_plot.set_ylim(initial_plot.get_ylim())
 
         fig.tight_layout(pad=2.0)

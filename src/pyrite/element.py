@@ -1,4 +1,12 @@
-from pyrite.datatypes import Node, MATERIAL_ELASTICITY, CROSS_AREA, MatrixIndex, Axis
+from pyrite.datatypes import (
+    Node,
+    MATERIAL_ELASTICITY,
+    CROSS_AREA,
+    MatrixIndex,
+    Axis,
+    POISSON_RATIO,
+    PART_THICKNESS,
+)
 import numpy as np
 import math
 
@@ -10,6 +18,8 @@ class Element:
         self.n2: Node = n2
         self.n3: Node = n3
 
+        self._check_ccw()
+
         self.n1_u = (0.0, 0.0)
         self.n2_u = (0.0, 0.0)
         self.n3_u = (0.0, 0.0)
@@ -19,61 +29,66 @@ class Element:
         self.row_indexes = []
         self.column_indexes = []
 
-        self._normal_stress = 0.0
-        self._normal_strain = 0.0
+        self.stress = 0
+
+    def _check_ccw(self) -> None:
+        """2D elements must be arranged counter-clockwise. Reassigns
+        nodes 1, 2, and 3 if needed.
+        """
+
+        if self.area < 0:
+            self.n1, self.n3 = (self.n3, self.n1)
 
     @property
-    def length(self) -> float:
-        """Calculates the length of the element"""
+    def area(self) -> float:
+        """Returns the area of the triangular element"""
 
-        dx = abs(self.n1.x - self.n2.x)
-        dy = abs(self.n1.y - self.n2.y)
-
-        return math.sqrt(dx**2 + dy**2)
-
-    @property
-    def local_stiffness_matrix(self) -> np.ndarray:
-        """Calculates the local stiffness matrix"""
-
-        line_element_matrix = np.array(
-            [[1, 0, -1, 0], [0, 0, 0, 0], [-1, 0, 1, 0], [0, 0, 0, 0]]
+        return 0.5 * (
+            self.n1.x * (self.n2.y - self.n3.y)
+            + self.n2.x * (self.n3.y - self.n1.y)
+            + self.n3.x * (self.n1.y - self.n2.y)
         )
 
-        return line_element_matrix * ((MATERIAL_ELASTICITY * CROSS_AREA) / self.length)
-
     @property
-    def element_angle(self) -> float:
-        """Calculates the angle of the element relative to the global
-        coordinate system. Returns a float in the interval [0, 360)"""
+    def strain_displacement_matrix(self) -> np.ndarray:
+        """Calculates the strain-displacement matrix of the element"""
 
-        dx = self.n1.x - self.n2.x
-        dy = self.n1.y - self.n2.y
+        beta_1 = self.n2.y - self.n3.y
+        beta_2 = self.n3.y - self.n1.y
+        beta_3 = self.n1.y - self.n2.y
 
-        if dx < 0:
-            dx *= -1
-            dy *= -1
+        gamma_1 = self.n3.x - self.n2.x
+        gamma_2 = self.n1.x - self.n3.x
+        gamma_3 = self.n2.x - self.n1.x
 
-        return math.degrees(math.atan2(dy, dx)) % 360
-
-    @property
-    def transition_matrix(self) -> np.ndarray:
-        """Computes the transition matrix for the global stiffness matrix"""
-
-        t = math.radians(self.element_angle)
-
-        C = math.cos(t)
-        S = math.sin(t)
-
-        # print(((MATERIAL_ELASTICITY * CROSS_AREA)/self.length))
-
-        return np.array(
+        B = np.array(
             [
-                [C**2, C * S, -(C**2), -C * S],
-                [C * S, S**2, -C * S, -(S**2)],
-                [-(C**2), -C * S, C**2, C * S],
-                [-C * S, -(S**2), C * S, S**2],
+                [beta_1, 0, beta_2, 0, beta_3, 0],
+                [0, gamma_1, 0, gamma_2, 0, gamma_3],
+                [gamma_1, beta_1, gamma_2, beta_2, gamma_3, beta_3],
+            ],
+            dtype=float,
+        )
+
+        B *= 1 / (2 * self.area)
+
+        return B
+
+    @property
+    def stress_strain_matrix(self) -> np.ndarray:
+        """Calculates the stress-strain matrix for the planar element"""
+
+        D = np.array(
+            [
+                [1, POISSON_RATIO, 0],
+                [POISSON_RATIO, 1, 0],
+                [0, 0, (1 - POISSON_RATIO) / 2],
             ]
         )
+
+        D *= MATERIAL_ELASTICITY / (1 - POISSON_RATIO**2)
+
+        return D
 
     def _calculate_global_stiffness_matrix(self) -> np.ndarray:
         """Computes the global stiffness matrix for the element"""
@@ -83,6 +98,8 @@ class Element:
             MatrixIndex(self.n1, Axis.Y),
             MatrixIndex(self.n2, Axis.X),
             MatrixIndex(self.n2, Axis.Y),
+            MatrixIndex(self.n3, Axis.X),
+            MatrixIndex(self.n3, Axis.Y),
         ]
 
         self.column_indexes = [
@@ -90,11 +107,24 @@ class Element:
             MatrixIndex(self.n1, Axis.Y),
             MatrixIndex(self.n2, Axis.X),
             MatrixIndex(self.n2, Axis.Y),
+            MatrixIndex(self.n3, Axis.X),
+            MatrixIndex(self.n3, Axis.Y),
         ]
 
-        # return self.transition_matrix  # TODO <-- Delete
-        return self.transition_matrix * (
-            (MATERIAL_ELASTICITY * CROSS_AREA) / self.length
+        print(
+            f"info: calculating global stiffness matrix for ({self.n1.index},{self.n2.index},{self.n3.index})"
+        )
+
+        return (
+            (
+                (
+                    self.strain_displacement_matrix.transpose()
+                    @ self.stress_strain_matrix
+                )
+                @ self.strain_displacement_matrix
+            )
+            * self.area
+            * PART_THICKNESS
         )
 
     @property
@@ -107,8 +137,11 @@ class Element:
         return self._global_stiffness_matrix
 
     def index_GSM(self, row: MatrixIndex, column: MatrixIndex):
+        """Index the element's global stiffness matrix"""
 
-        self._calculate_global_stiffness_matrix()
+        self.global_stiffness_matrix
+
+        # print(f"debug: indexing element {self} at {row.node.index}, {column.node.index}")
 
         if row in self.row_indexes and column in self.column_indexes:
 
@@ -120,27 +153,12 @@ class Element:
             return 0
 
     @property
-    def normal_strain(self) -> float:
-        """Returns the normal strain of the element. This is usually
-        set after solving by the post-processor.
-        """
-        return self._normal_strain
+    def perimeter(self) -> float:
+        """Returns the perimeter of the element"""
 
-    @normal_strain.setter
-    def normal_strain(self, value: float) -> None:
-        """Sets the normal strain in the element. This should only be
-        set by the post-processor.
-        """
+        raise NotImplementedError()
 
-        self._normal_strain = value
+        return 0
 
-    @property
-    def normal_stress(self) -> float:
-        """Returns the average stress from the calculated strain. Note,
-        if the strain attribute was not set, this will default to zero.
-
-        Returns:
-            The stress, in whichever unit MATERIAL_ELASTICITY is set.
-        """
-
-        return MATERIAL_ELASTICITY * self.normal_strain
+    def __repr__(self) -> str:
+        return f"Element({self.n1.index}, {self.n2.index}, {self.n3.index})"

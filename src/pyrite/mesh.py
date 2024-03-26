@@ -1,5 +1,8 @@
+import json
+import os
+from typing import Callable
 from matplotlib import pyplot as plt
-from pyrite.datatypes import Node, MshState
+from pyrite.datatypes import Node, MshState, BoundaryTarget
 from pyrite.element import Element
 
 from scipy.spatial import Delaunay
@@ -21,6 +24,82 @@ class Mesh:
 
     def __init__(self, vertices: np.ndarray):
         self.vertices = vertices
+
+
+class BoundaryRule:
+
+    SUPPORTED_TARGETS = ("ux", "uy", "fx", "fy")
+
+    def __init__(self, name: str, targets: dict[str, float], region: dict[str, float]):
+
+        self.name = name
+        self.checks: list[Callable] = []
+        self.targets = targets
+        self._region = region
+
+        self._parse_region(region)
+
+    def _register_check(self, check_id: str, value: float):
+        """Registers a check for the boundary rule
+
+        Args:
+            check_id: The check identifier, like 'x_target_min', for example.
+            value: The corresponding value for the check_id
+        """
+
+        if check_id == "x_target_min":
+            self.checks.append(lambda point: point.x >= value)
+        elif check_id == "x_target_max":
+            self.checks.append(lambda point: point.x <= value)
+        elif check_id == "y_target_min":
+            self.checks.append(lambda point: point.y >= value)
+        elif check_id == "y_target_max":
+            self.checks.append(lambda point: point.y <= value)
+        else:
+            raise RuntimeError(f"Unrecognized check identifier {check_id}")
+
+    def _parse_region(self, region: dict[str, float]):
+        """Parses a region into a list of checks
+
+        Args:
+            region: A dictionary mapping check ids to their corresponding values
+        """
+
+        for check_id, check_value in region.items():
+            self._register_check(check_id, check_value)
+
+    def maybe_apply_to_node(self, node: Node):
+        """Applies targets to the node if it meets the criteria
+
+        Args:
+            node: The node to modify
+        """
+
+        if self.check(node):
+            node.ux = self.targets["ux"]
+            node.uy = self.targets["uy"]
+            node.Fx = self.targets["fx"]
+            node.Fy = self.targets["fy"]
+
+    def check(self, point) -> bool:
+        """Runs a point through all the checks for the boundary rule.
+
+        Args:
+            point: A value that gives x & y or r & θ values (depending on
+                the coord system) when called with point.x, point.y, etc.
+        """
+
+        for check in self.checks:
+            if not check(point):
+                return False
+
+        return True
+
+    def __str__(self):
+        return f"BoundaryRule({self.targets})"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class Mesher:
@@ -46,6 +125,30 @@ class Mesher:
 
         """
 
+        # # Register groups that elements may belong to
+        # displacement_groups = ({}, {})
+        # force_groups = ({}, {})
+
+        # for x, y, ux, uy, fx, fy in outer_vertices:
+
+        #     if ux not in displacement_groups[0] and not np.isnan(ux):
+        #         displacement_groups[0][f"nodal_displacement_x_{ux}"] = []
+
+        #     if uy not in displacement_groups[1] and not np.isnan(uy):
+        #         displacement_groups[1][f"nodal_displacement_y_{uy}"] = []
+
+        #     if fx not in force_groups[0] and not np.isnan(fx):
+        #         force_groups[0][f"nodal_displacement_x_{fx}"] = []
+
+        #     if fy not in force_groups[1] and not np.isnan(fy):
+        #         force_groups[1][f"nodal_displacement_y_{fy}"] = []
+
+        # # add nan placeholders
+        # displacement_groups[0]["nodal_displacement_x_nan"] = []
+        # displacement_groups[1]["nodal_displacement_y_nan"] = []
+        # force_groups[0]["nodal_force_x_nan"] = []
+        # force_groups[1]["nodal_force_y_nan"] = []
+
         ELEMENT_ORDER = 1
         ALGORITHM = 1  # delaunay
 
@@ -54,8 +157,7 @@ class Mesher:
             # define points
             f.write("// Define Points\n")
             for i, vertex in enumerate(outer_vertices):
-                x = vertex[0]
-                y = vertex[1]
+                x, y, ux, uy, fx, fy = vertex
 
                 f.write(f"Point({i}) = {{{x}, {y}, 0, 1.0}};\n")
 
@@ -113,16 +215,14 @@ class Mesher:
         nodes: dict[int, Node] = {}
         triangles = []
         state = MshState.LIMBO
-
-        num_nodes = 0
         parsed_metadata = False
+        skipped_elements = 0
 
         with open(mesh_file, "r") as f:
 
             while f.readable():
 
                 line = f.readline()
-                print(state)
 
                 # detect state change
                 if state is MshState.LIMBO:
@@ -154,7 +254,6 @@ class Mesher:
                     # read metadata on first line
                     if not parsed_metadata:
                         num_nodes = int(line.strip().split(" ")[1])
-                        print("Num nodes:", num_nodes)
                         parsed_metadata = True
                         continue
 
@@ -176,9 +275,16 @@ class Mesher:
                             x, y, z = [
                                 float(i) for i in f.readline().strip().split(" ")
                             ]
-                            node = Node(x, y, z, None, None, None, node_tags[i])
-                            print("registered node:", node)
-                            nodes[node_tags[i]] = node
+                            node = Node(
+                                x=x,
+                                y=y,
+                                ux=None,
+                                uy=None,
+                                Fx=0,
+                                Fy=0,
+                                index=node_tags[i] - 1,
+                            )
+                            nodes[node_tags[i] - 1] = node
 
                 if state is MshState.ELEMENTS:
                     if not parsed_metadata:
@@ -193,20 +299,26 @@ class Mesher:
                             data = [int(i) for i in f.readline().strip().split(" ")]
 
                             if entity_dim != 2:
-                                print(f"Skipping element {data[0]}. Not 2D")
+                                skipped_elements += 1
 
                             else:
                                 element_tag, n1, n2, n3 = data
-                                print("registered triangle:", (n1, n2, n3))
                                 triangles.append((n1, n2, n3))
 
         elements: list[Element] = []
         for n1_idx, n2_idx, n3_idx in triangles:
-            n1 = nodes[n1_idx]
-            n2 = nodes[n2_idx]
-            n3 = nodes[n3_idx]
+            n1 = nodes[n1_idx - 1]
+            n2 = nodes[n2_idx - 1]
+            n3 = nodes[n3_idx - 1]
+
+            # NOTE: Triangles are given by note tags, which start at index 1
+            # whereas our node indices start at index 0
 
             elements.append(Element(n1, n2, n3))
+
+        print(f"info: skipped {skipped_elements} elements")
+        print(f"info: registered {len(nodes)} nodes")
+        print(f"info: registered {len(triangles)} triangles")
 
         return list(nodes.values()), elements
 
@@ -278,9 +390,31 @@ class Mesher:
 
         return vertices
 
+    def _register_boundary_conditions(self, boundary_file: str, nodes: list[Node]):
+        """Registers the boundary conditions set in a boundary file."""
+
+        boundary_file_data = {}
+        boundary_rules: list[BoundaryRule] = []
+
+        with open(boundary_file, "r") as f:
+            boundary_file_data = json.load(f)
+
+        for check_name, check_data in boundary_file_data.items():
+
+            region = check_data["region"]
+            targets = check_data["targets"]
+
+            rule = BoundaryRule(check_name, targets, region)
+            boundary_rules.append(rule)
+
+        for node in nodes:
+            for rule in boundary_rules:
+                rule.maybe_apply_to_node(node)
+
     def mesh(
         self,
         input_csv: str,
+        boundary_file: str,
         characteristic_length: float,
         characteristic_length_variance: float,
     ) -> tuple[list[Node], list[Element]]:
@@ -310,4 +444,10 @@ class Mesher:
         )
         self._compute_mesh(geo_filename, mesh_filename)
         nodes, elements = self._parse_mesh(mesh_filename)
+
+        self._register_boundary_conditions(boundary_file, nodes)
+
+        # cleanup files
+        os.remove(geo_filename)
+        os.remove(mesh_filename)
         return nodes, elements
