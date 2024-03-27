@@ -21,7 +21,7 @@ class PostProcessor:
         nodal_displacements: np.ndarray, elements: list[Element]
     ) -> None:
         """Loads the nodal displacements into each element object
-        
+
         Args:
             nodal_displacements: An array of nodal displacements
             elements: A list of Elements
@@ -45,7 +45,7 @@ class PostProcessor:
         """Computes the stress from the solved nodal displacements and
         loads into element. This means load_displacements_into_elements
         must be called first.
-        
+
         Args:
             elements: A list of Elements
         """
@@ -134,7 +134,7 @@ class PostProcessor:
         nodes: list[Node],
     ) -> None:
         """Outputs the solved system to output.csv
-        
+
         Args:
             nodal_forces: The vector of solved nodal forces
             nodal_displacements: The vector of solved nodal displacements
@@ -159,7 +159,7 @@ class PostProcessor:
 
     def show(self, elements: list[Element]) -> None:
         """Shows post-processed results with matplotlib
-        
+
         Args:
             elements: The list of elements to plot
         """

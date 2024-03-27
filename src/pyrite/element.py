@@ -17,7 +17,7 @@ import numpy as np
 
 class Element:
 
-    poisson_ratio: float 
+    poisson_ratio: float
     part_thickness: float
     material_elasticity: int
 

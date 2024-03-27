@@ -44,7 +44,7 @@ class Solver:
         total_stiffness_matrix = np.zeros((size, size))
 
         for element in tqdm(elements, "info: building element stiffness matrices"):
-            element.global_stiffness_matrix # call property to prevent re-calculations
+            element.global_stiffness_matrix  # call property to prevent re-calculations
 
         for element in tqdm(elements, "info: building total stiffness matrix"):
 
@@ -64,7 +64,7 @@ class Solver:
 
     def _calculate_force_vector(self, nodes: list[Node]) -> np.ndarray:
         """Calculates column vector of forces
-        
+
         Args:
             nodes: The list of Nodes to use
 
@@ -83,10 +83,10 @@ class Solver:
 
     def _calculate_displacement_vector(self, nodes: list[Node]) -> np.ndarray:
         """Calculates column vector of displacements.
-        
+
         Args:
             nodes: The list of Nodes to use
-            
+
         Returns:
             A column vector of nodal displacements
         """
@@ -223,7 +223,7 @@ class Solver:
         nodal_displacements: np.ndarray,
         total_stiffness_matrix: np.ndarray,
     ) -> None:
-        """Solves for unknown forces and nodal displacements. nodal_forces and 
+        """Solves for unknown forces and nodal displacements. nodal_forces and
         nodal_displacements arrays will be updated with solved values
         """
 
@@ -244,9 +244,9 @@ class Solver:
                 total_stiffness_matrix,
             )
 
-            known_forces = np.array([i for i in nodal_forces if not np.isnan(i)]).reshape(
-                num_unknown_displacements, 1
-            )
+            known_forces = np.array(
+                [i for i in nodal_forces if not np.isnan(i)]
+            ).reshape(num_unknown_displacements, 1)
 
             known_matrix_summed = np.array([sum(i) for i in known_matrix]).reshape(
                 (num_unknown_displacements, 1)
@@ -284,7 +284,7 @@ class Solver:
             # self.display_total_matrix(
             #     nodal_forces, nodal_displacements, total_stiffness_matrix
             # )
-        
+
         except Exception as e:
             raise SolverError(f"Unable to solve system: {type(e).__name__}: {str(e)}")
 
@@ -305,8 +305,7 @@ class Solver:
         # Create total stiffness matrix from nodes and elements
         print("info: assembling total stiffness matrix")
         total_stiffness_matrix = self._create_total_stiffness_matrix(
-            size=DOF * len(self.nodes), 
-            elements=self.elements
+            size=DOF * len(self.nodes), elements=self.elements
         )
 
         # Create nodal forces/displacement vectors
@@ -323,7 +322,6 @@ class Solver:
         # Solve matrix
         print("info: solving system...")
         self.solve(nodal_forces, nodal_displacements, total_stiffness_matrix)
-        
 
         # Load nodal displacements into each element object
         print("info: post processing...")

@@ -292,7 +292,7 @@ class Mesher:
         Element.material_elasticity = self.part_metadata.material_elasticity
         Element.poisson_ratio = self.part_metadata.poisson_ratio
         Element.part_thickness = self.part_metadata.part_thickness
-        
+
         elements: list[Element] = []
         for n1_idx, n2_idx, n3_idx in triangles:
             n1 = nodes[n1_idx - 1]
@@ -380,14 +380,13 @@ class Mesher:
             raise InputError(f"Error in vertex file: {type(e).__name__}{str(e)}")
 
         return vertices
-    
 
     def _load_metadata(self, input_file: str) -> PartMetadata:
         """Loads the metadata from the input file.
-        
+
         Args:
             input_file: The input json to load
-        
+
         Returns:
             A PartMetadata object that contains the loaded metadata
         """
@@ -405,19 +404,16 @@ class Mesher:
             poisson_ratio = metadata["poisson_ratio"]
             part_thickness = metadata["part_thickness"]
 
-            return PartMetadata(
-                material_elasticity, poisson_ratio, part_thickness
-            )
+            return PartMetadata(material_elasticity, poisson_ratio, part_thickness)
         except KeyError as e:
             raise InputError(f"Input file missing field {str(e)}")
-        
 
     def _apply_boundary_conditions(self, input_file: str, nodes: list[Node]):
         """Applies boundary conditions from the input file onto a list of nodes
-        
+
         Args:
             input_file: The path to the input file
-            nodes: A list of nodes from the mesh to apply the boundary conditions   
+            nodes: A list of nodes from the mesh to apply the boundary conditions
                 to.
         """
 
@@ -428,7 +424,9 @@ class Mesher:
             input_file_data = json.load(f)
 
         try:
-            for check_name, check_data in input_file_data["boundary_conditions"].items():
+            for check_name, check_data in input_file_data[
+                "boundary_conditions"
+            ].items():
 
                 region = check_data["region"]
                 targets = check_data["targets"]
@@ -466,10 +464,14 @@ class Mesher:
         """
 
         if not os.path.exists(input_file):
-            raise InputError(f"Could not find input file at {os.path.abspath(input_file)}")
-        
+            raise InputError(
+                f"Could not find input file at {os.path.abspath(input_file)}"
+            )
+
         if not os.path.exists(vertex_csv):
-            raise InputError(f"Could not find vertices csv at {os.path.abspath(vertex_csv)}")
+            raise InputError(
+                f"Could not find vertices csv at {os.path.abspath(vertex_csv)}"
+            )
 
         vertices = self._parse_csv(vertex_csv)
 
@@ -492,5 +494,5 @@ class Mesher:
         # cleanup files
         os.remove(geo_filename)
         os.remove(mesh_filename)
-        
+
         return nodes, elements
