@@ -54,3 +54,9 @@ This repo contains two examples in the `examples/` dir.
 - There is no contact recognition, meaning that it is possible for a part to clip within itself.
 
 > There are many more limitations that are inherent with a single-part, 2D, isotropic linear-elastic static mechanical solver; the list above highlights the most restrictive of these.
+
+## Citations
+
+The equations used to obtain stiffness matrices were derived in this [University of New Mexico Paper](https://www.unm.edu/~bgreen/ME360/2D%20Triangular%20Elements.pdf).
+
+More information is found on this [Wikipedia page](https://en.wikipedia.org/wiki/Finite_element_method)
