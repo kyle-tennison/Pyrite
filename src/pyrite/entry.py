@@ -41,6 +41,12 @@ def entry():
         default=0.06,
         type=float,
     )
+    parser.add_argument(
+        "-s",
+        "--show_mesh",
+        help="Show mesh before solving",
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
@@ -49,11 +55,14 @@ def entry():
     mesher = Mesher()
 
     nodes, elements = mesher.mesh(
-        vertex_csv=args.vertices,
+        vertex_file=args.vertices,
         input_file=args.boundary,
         characteristic_length=args.characteristic_length,
         characteristic_length_variance=args.characteristic_length_variance,
     )
+
+    if args.show_mesh:
+        mesher.plot_elements(elements)
 
     solver.run(nodes, elements)
 

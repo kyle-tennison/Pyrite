@@ -12,11 +12,12 @@ from pyrite.error import InputError
 
 from matplotlib.patches import Polygon
 from matplotlib import pyplot as plt
-import json
-import os
+import xml.etree.ElementTree as ET
 from typing import Callable
 import numpy as np
 import subprocess
+import json
+import os
 
 
 def try_float(string: str):
@@ -141,7 +142,7 @@ class Mesher:
             # define points
             f.write("// Define Points\n")
             for i, vertex in enumerate(outer_vertices):
-                x, y, ux, uy, fx, fy = vertex
+                x, y = vertex
 
                 f.write(f"Point({i}) = {{{x}, {y}, 0, 1.0}};\n")
 
@@ -319,6 +320,8 @@ class Mesher:
             elements: A list of Element objects to plot
         """
 
+        plt.style.use("seaborn-v0_8")
+
         triangles = np.empty((len(elements), 3, 2))
 
         for i, element in enumerate(elements):
@@ -334,7 +337,7 @@ class Mesher:
         for triangle in triangles:
 
             polygon = Polygon(
-                triangle, closed=True, edgecolor="black", linewidth=2, alpha=0.7
+                triangle, closed=True, edgecolor="black", linewidth=0.2, alpha=0.7
             )
 
             polygon.set_facecolor(tuple(np.random.random(3)))
@@ -350,20 +353,20 @@ class Mesher:
         plt.axis("equal")  # Equal aspect ratio
         plt.show()
 
-    def _parse_csv(self, input_file: str) -> list[tuple]:
+    def _parse_csv(self, csv_file: str) -> list[tuple]:
         """Parses CSV of vertices into a list of (x,y) tuples
 
         Args:
-            input_file: The filepath of the CSV file to reference
+            csv_file: The filepath of the CSV file to reference
 
         Returns:
-            A list of tuples that contain vertex coordinates and metadata
+            A list of tuples that contain vertex coordinates
         """
 
         vertices = []
 
         try:
-            with open(input_file, "r") as f:
+            with open(csv_file, "r") as f:
 
                 headers = [i.strip() for i in f.readline().strip().split(",")]
 
@@ -371,16 +374,37 @@ class Mesher:
 
                     x = float(line[headers.index("x")])
                     y = float(line[headers.index("y")])
-                    ux = try_float(line[headers.index("ux")])
-                    uy = try_float(line[headers.index("uy")])
-                    fx = try_float(line[headers.index("fx")])
-                    fy = try_float(line[headers.index("fy")])
 
-                    vertices.append((x, y, ux, uy, fx, fy))
+                    vertices.append((x, y))
         except Exception as e:
             raise InputError(f"Error in vertex file: {type(e).__name__}{str(e)}")
 
         return vertices
+    
+    def _parse_svg(self, svg_file: str) -> list[tuple]:
+        """Parses a SVG file into a list of (x,y) vertices
+        
+        Args:
+            svg_file: The SVG file to parse
+            
+        Returns:
+            A list of tuples that contain vertex coordinates
+        """
+
+        root = ET.parse(svg_file).getroot()
+
+        points_raw = [float(i) for i in root[1][0].get("points", "").split(" ")]
+        points = []
+
+        i = 0
+        while i < len(points_raw):
+
+            x, y = points_raw[i], points_raw[i+1]
+            points.append((x,-y))
+
+            i += 2
+
+        return points
 
     def _load_metadata(self, input_file: str) -> PartMetadata:
         """Loads the metadata from the input file.
@@ -443,7 +467,7 @@ class Mesher:
 
     def mesh(
         self,
-        vertex_csv: str,
+        vertex_file: str,
         input_file: str,
         characteristic_length: float,
         characteristic_length_variance: float,
@@ -452,7 +476,7 @@ class Mesher:
         elements. Applies boundary conditions from input json.
 
         Args:
-            vertex_csv: The filepath to the input CSV that contains a list of
+            vertex_file: The filepath to the CSV or SVG that contains a list of
                 vertices
             input_file: The filepath to the input json that defines
                 boundary conditions and geometry metadata
@@ -469,12 +493,18 @@ class Mesher:
                 f"Could not find input file at {os.path.abspath(input_file)}"
             )
 
-        if not os.path.exists(vertex_csv):
+        if not os.path.exists(vertex_file):
             raise InputError(
-                f"Could not find vertices csv at {os.path.abspath(vertex_csv)}"
+                f"Could not find vertices csv at {os.path.abspath(vertex_file)}"
             )
 
-        vertices = self._parse_csv(vertex_csv)
+
+        if vertex_file.endswith(".csv"):
+            vertices = self._parse_csv(vertex_file)
+        elif vertex_file.endswith(".svg"):
+            vertices = self._parse_svg(vertex_file)
+        else:
+            raise InputError(f"Unknown vertex filetype")
 
         geo_filename = "geom.geo"
         mesh_filename = "geom.msh"

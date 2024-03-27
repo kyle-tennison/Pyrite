@@ -1,0 +1,1 @@
+pyrite pyrite.svg input.json -cl 15 -cv 5
