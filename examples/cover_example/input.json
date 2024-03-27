@@ -23,10 +23,10 @@
           "y_target_max": 3
         },
         "targets": {
-          "ux": 0,
+          "ux": null,
           "uy": null,
-          "fx": null,
-          "fy": 1e6
+          "fx": 0,
+          "fy": 5e7
         }
       }
     }
