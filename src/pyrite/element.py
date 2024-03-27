@@ -74,7 +74,11 @@ class Element:
             dtype=float,
         )
 
-        B *= 1 / (2 * self.area)
+        # Prevent zero division
+        if self.area == 0:
+            B *= 0
+        else:
+            B *= 1 / (2 * self.area)
 
         return B
 
