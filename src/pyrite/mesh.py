@@ -1,16 +1,23 @@
-import json
-import os
-from typing import Callable
-from matplotlib import pyplot as plt
-from pyrite.datatypes import Node, MshState, BoundaryTarget
+"""
+Meshing utility build around Gmsh. Handles mesh generation and boundary
+condition application.
+
+March 25, 2024
+Kyle Tennison
+"""
+
+from pyrite.datatypes import Node, MshState, PartMetadata
 from pyrite.element import Element
 from pyrite.error import InputError
 
-from scipy.spatial import Delaunay
-import numpy as np
-from itertools import combinations
-import subprocess
 from matplotlib.patches import Polygon
+from matplotlib import pyplot as plt
+import xml.etree.ElementTree as ET
+from typing import Callable
+import numpy as np
+import subprocess
+import json
+import os
 
 
 def try_float(string: str):
@@ -29,14 +36,13 @@ class Mesh:
 
 class BoundaryRule:
 
-    SUPPORTED_TARGETS = ("ux", "uy", "fx", "fy")
-
     def __init__(self, name: str, targets: dict[str, float], region: dict[str, float]):
 
         self.name = name
         self.checks: list[Callable] = []
         self.targets = targets
         self._region = region
+        self.part_metadata: PartMetadata
 
         self._parse_region(region)
 
@@ -76,11 +82,14 @@ class BoundaryRule:
             node: The node to modify
         """
 
-        if self.check(node):
-            node.ux = self.targets["ux"]
-            node.uy = self.targets["uy"]
-            node.Fx = self.targets["fx"]
-            node.Fy = self.targets["fy"]
+        try:
+            if self.check(node):
+                node.ux = self.targets["ux"]
+                node.uy = self.targets["uy"]
+                node.Fx = self.targets["fx"]
+                node.Fy = self.targets["fy"]
+        except KeyError as e:
+            raise InputError(f"Input file missing target '{str(e)}'")
 
     def check(self, point) -> bool:
         """Runs a point through all the checks for the boundary rule.
@@ -113,7 +122,7 @@ class Mesher:
         output_file: str,
         characteristic_length: float,
         characteristic_length_variance: float,
-    ):
+    ) -> None:
         """Generates a .geo file from a list of vertices.
 
         Args:
@@ -123,42 +132,17 @@ class Mesher:
             characteristic_length: The mean characteristic element length
             characteristic_length_variance: The ± variance allowed
                 in the characteristic length.
-
         """
-
-        # # Register groups that elements may belong to
-        # displacement_groups = ({}, {})
-        # force_groups = ({}, {})
-
-        # for x, y, ux, uy, fx, fy in outer_vertices:
-
-        #     if ux not in displacement_groups[0] and not np.isnan(ux):
-        #         displacement_groups[0][f"nodal_displacement_x_{ux}"] = []
-
-        #     if uy not in displacement_groups[1] and not np.isnan(uy):
-        #         displacement_groups[1][f"nodal_displacement_y_{uy}"] = []
-
-        #     if fx not in force_groups[0] and not np.isnan(fx):
-        #         force_groups[0][f"nodal_displacement_x_{fx}"] = []
-
-        #     if fy not in force_groups[1] and not np.isnan(fy):
-        #         force_groups[1][f"nodal_displacement_y_{fy}"] = []
-
-        # # add nan placeholders
-        # displacement_groups[0]["nodal_displacement_x_nan"] = []
-        # displacement_groups[1]["nodal_displacement_y_nan"] = []
-        # force_groups[0]["nodal_force_x_nan"] = []
-        # force_groups[1]["nodal_force_y_nan"] = []
 
         ELEMENT_ORDER = 1
         ALGORITHM = 1  # delaunay
 
-        with open("geom.geo", "w") as f:
+        with open(output_file, "w") as f:
 
             # define points
             f.write("// Define Points\n")
             for i, vertex in enumerate(outer_vertices):
-                x, y, ux, uy, fx, fy = vertex
+                x, y = vertex
 
                 f.write(f"Point({i}) = {{{x}, {y}, 0, 1.0}};\n")
 
@@ -190,11 +174,12 @@ class Mesher:
             )
             f.write(f"Mesh 2;\n")
 
-    def _compute_mesh(self, geo_file: str, output_file: str = "output.msh"):
-        """Runs gmsh to compute mesh from .geo file
+    def _compute_mesh(self, geo_file: str, output_file: str = "output.msh") -> None:
+        """Runs Gmsh to compute mesh from .geo file
 
         Args:
             geo_file: The .geo file to target
+            output_file: The output .msh file. Defaults to 'output.msh'
         """
 
         try:
@@ -203,7 +188,7 @@ class Mesher:
             raise RuntimeError(f"Failed to generate mesh: {str(e)}")
 
     def _parse_mesh(self, mesh_file: str) -> tuple[list[Node], list[Element]]:
-        """Parses a mesh file, building nodes and elements.
+        """Parses a .msh file, building nodes and elements.
 
         Args:
             mesh_file: The .msh file to target
@@ -306,6 +291,10 @@ class Mesher:
                                 element_tag, n1, n2, n3 = data
                                 triangles.append((n1, n2, n3))
 
+        Element.material_elasticity = self.part_metadata.material_elasticity
+        Element.poisson_ratio = self.part_metadata.poisson_ratio
+        Element.part_thickness = self.part_metadata.part_thickness
+
         elements: list[Element] = []
         for n1_idx, n2_idx, n3_idx in triangles:
             n1 = nodes[n1_idx - 1]
@@ -331,6 +320,8 @@ class Mesher:
             elements: A list of Element objects to plot
         """
 
+        plt.style.use("seaborn-v0_8")
+
         triangles = np.empty((len(elements), 3, 2))
 
         for i, element in enumerate(elements):
@@ -346,7 +337,7 @@ class Mesher:
         for triangle in triangles:
 
             polygon = Polygon(
-                triangle, closed=True, edgecolor="black", linewidth=2, alpha=0.7
+                triangle, closed=True, edgecolor="black", linewidth=0.2, alpha=0.7
             )
 
             polygon.set_facecolor(tuple(np.random.random(3)))
@@ -362,46 +353,105 @@ class Mesher:
         plt.axis("equal")  # Equal aspect ratio
         plt.show()
 
-    def _parse_csv(self, input_file: str) -> list[tuple]:
-        """Parses input CSV that contains vertices
+    def _parse_csv(self, csv_file: str) -> list[tuple]:
+        """Parses CSV of vertices into a list of (x,y) tuples
 
         Args:
-            input_file: The filepath of the CSV file to reference
+            csv_file: The filepath of the CSV file to reference
 
         Returns:
-            A list of tuples that contain vertex coordinates and metadata
+            A list of tuples that contain vertex coordinates
         """
 
         vertices = []
 
-        with open(input_file, "r") as f:
+        try:
+            with open(csv_file, "r") as f:
 
-            headers = [i.strip() for i in f.readline().strip().split(",")]
+                headers = [i.strip() for i in f.readline().strip().split(",")]
 
-            for line in [i.strip().split(",") for i in f.readlines()]:
+                for line in [i.strip().split(",") for i in f.readlines()]:
 
-                x = float(line[headers.index("x")])
-                y = float(line[headers.index("y")])
-                ux = try_float(line[headers.index("ux")])
-                uy = try_float(line[headers.index("uy")])
-                fx = try_float(line[headers.index("fx")])
-                fy = try_float(line[headers.index("fy")])
+                    x = float(line[headers.index("x")])
+                    y = float(line[headers.index("y")])
 
-                vertices.append((x, y, ux, uy, fx, fy))
+                    vertices.append((x, y))
+        except Exception as e:
+            raise InputError(f"Error in vertex file: {type(e).__name__}{str(e)}")
 
         return vertices
+    
+    def _parse_svg(self, svg_file: str) -> list[tuple]:
+        """Parses a SVG file into a list of (x,y) vertices
+        
+        Args:
+            svg_file: The SVG file to parse
+            
+        Returns:
+            A list of tuples that contain vertex coordinates
+        """
 
-    def _register_boundary_conditions(self, boundary_file: str, nodes: list[Node]):
-        """Registers the boundary conditions set in a boundary file."""
+        root = ET.parse(svg_file).getroot()
 
-        boundary_file_data = {}
-        boundary_rules: list[BoundaryRule] = []
+        points_raw = [float(i) for i in root[1][0].get("points", "").split(" ")]
+        points = []
 
-        with open(boundary_file, "r") as f:
-            boundary_file_data = json.load(f)
+        i = 0
+        while i < len(points_raw):
+
+            x, y = points_raw[i], points_raw[i+1]
+            points.append((x,-y))
+
+            i += 2
+
+        return points
+
+    def _load_metadata(self, input_file: str) -> PartMetadata:
+        """Loads the metadata from the input file.
+
+        Args:
+            input_file: The input json to load
+
+        Returns:
+            A PartMetadata object that contains the loaded metadata
+        """
+
+        with open(input_file, "r") as f:
+            try:
+                input_file_data = json.load(f)
+            except json.JSONDecodeError as e:
+                raise InputError(f"Error in input file json: {str(e)}")
 
         try:
-            for check_name, check_data in boundary_file_data.items():
+            metadata = input_file_data["metadata"]
+
+            material_elasticity = metadata["material_elasticity"]
+            poisson_ratio = metadata["poisson_ratio"]
+            part_thickness = metadata["part_thickness"]
+
+            return PartMetadata(material_elasticity, poisson_ratio, part_thickness)
+        except KeyError as e:
+            raise InputError(f"Input file missing field {str(e)}")
+
+    def _apply_boundary_conditions(self, input_file: str, nodes: list[Node]):
+        """Applies boundary conditions from the input file onto a list of nodes
+
+        Args:
+            input_file: The path to the input file
+            nodes: A list of nodes from the mesh to apply the boundary conditions
+                to.
+        """
+
+        input_file_data = {}
+        boundary_rules: list[BoundaryRule] = []
+
+        with open(input_file, "r") as f:
+            input_file_data = json.load(f)
+
+        try:
+            for check_name, check_data in input_file_data[
+                "boundary_conditions"
+            ].items():
 
                 region = check_data["region"]
                 targets = check_data["targets"]
@@ -409,8 +459,7 @@ class Mesher:
                 rule = BoundaryRule(check_name, targets, region)
                 boundary_rules.append(rule)
         except KeyError as e:
-            raise InputError(f"Error in boundary file: Missing key {str(e)}")
-
+            raise InputError(f"Input file missing field {str(e)}")
 
         for node in nodes:
             for rule in boundary_rules:
@@ -418,16 +467,19 @@ class Mesher:
 
     def mesh(
         self,
-        input_csv: str,
-        boundary_file: str,
+        vertex_file: str,
+        input_file: str,
         characteristic_length: float,
         characteristic_length_variance: float,
     ) -> tuple[list[Node], list[Element]]:
-        """Creates a mesh from a list of 2D vertices
+        """Meshes geometry from vertices csv and loads results into nodes and
+        elements. Applies boundary conditions from input json.
 
         Args:
-            input_csv: The filepath to the input CSV that contains a list of
+            vertex_file: The filepath to the CSV or SVG that contains a list of
                 vertices
+            input_file: The filepath to the input json that defines
+                boundary conditions and geometry metadata
             characteristic_length: The mean characteristic element length.
             characteristic_length_variance: The ± variance allowed
                 in the characteristic length.
@@ -436,10 +488,28 @@ class Mesher:
             A list of Nodes and Elements
         """
 
-        vertices = self._parse_csv(input_csv)
+        if not os.path.exists(input_file):
+            raise InputError(
+                f"Could not find input file at {os.path.abspath(input_file)}"
+            )
+
+        if not os.path.exists(vertex_file):
+            raise InputError(
+                f"Could not find vertices csv at {os.path.abspath(vertex_file)}"
+            )
+
+
+        if vertex_file.endswith(".csv"):
+            vertices = self._parse_csv(vertex_file)
+        elif vertex_file.endswith(".svg"):
+            vertices = self._parse_svg(vertex_file)
+        else:
+            raise InputError(f"Unknown vertex filetype")
 
         geo_filename = "geom.geo"
         mesh_filename = "geom.msh"
+
+        self.part_metadata = self._load_metadata(input_file)
 
         self._generate_geo(
             vertices,
@@ -450,9 +520,10 @@ class Mesher:
         self._compute_mesh(geo_filename, mesh_filename)
         nodes, elements = self._parse_mesh(mesh_filename)
 
-        self._register_boundary_conditions(boundary_file, nodes)
+        self._apply_boundary_conditions(input_file, nodes)
 
         # cleanup files
         os.remove(geo_filename)
         os.remove(mesh_filename)
+
         return nodes, elements

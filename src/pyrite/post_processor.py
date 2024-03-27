@@ -1,11 +1,17 @@
-import math
+"""
+Post-processor to solve for planar stresses and display results
 
-from matplotlib.patches import Polygon
+Kyle Tennison
+March 24, 2024
+"""
+
 from pyrite.datatypes import Node, DOF
 from pyrite.element import Element
 
-import numpy as np
+from matplotlib.patches import Polygon
 import matplotlib.pyplot as plt
+import numpy as np
+import math
 
 
 class PostProcessor:
@@ -13,8 +19,13 @@ class PostProcessor:
     @staticmethod
     def load_displacements_into_elements(
         nodal_displacements: np.ndarray, elements: list[Element]
-    ):
-        """Loads the nodal displacements into each element object"""
+    ) -> None:
+        """Loads the nodal displacements into each element object
+
+        Args:
+            nodal_displacements: An array of nodal displacements
+            elements: A list of Elements
+        """
 
         for element in elements:
             n1_ux = nodal_displacements[2 * element.n1.index]
@@ -30,10 +41,13 @@ class PostProcessor:
             element.n2_u = (n2_ux, n2_uy)
             element.n3_u = (n3_ux, n3_uy)
 
-    def compute_stress(self, elements: list[Element]):
+    def compute_stress(self, elements: list[Element]) -> None:
         """Computes the stress from the solved nodal displacements and
         loads into element. This means load_displacements_into_elements
         must be called first.
+
+        Args:
+            elements: A list of Elements
         """
 
         for element in elements:
@@ -118,8 +132,14 @@ class PostProcessor:
         nodal_forces: np.ndarray,
         nodal_displacements: np.ndarray,
         nodes: list[Node],
-    ):
-        """Outputs the solved system to output.csv"""
+    ) -> None:
+        """Outputs the solved system to output.csv
+
+        Args:
+            nodal_forces: The vector of solved nodal forces
+            nodal_displacements: The vector of solved nodal displacements
+            nodes: The list of Nodes
+        """
 
         with open("output.csv", "w") as f:
             f.write("x, y, ux, uy, fx, fy\n")
@@ -137,8 +157,12 @@ class PostProcessor:
 
                 i += 2
 
-    def show(self, input_file: str, elements: list[Element]):
-        """Shows post-processed results"""
+    def show(self, elements: list[Element]) -> None:
+        """Shows post-processed results with matplotlib
+
+        Args:
+            elements: The list of elements to plot
+        """
 
         plt.style.use("seaborn-v0_8")
 

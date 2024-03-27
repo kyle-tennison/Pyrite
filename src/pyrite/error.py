@@ -1,11 +1,23 @@
+"""
+Custom Error Handling. Omits traceback for custom errors.
+
+March 26, 2024
+Kyle Tennison
+"""
+
 import sys
 
-class PyriteError(Exception): 
+
+class PyriteError(Exception):
 
     def __init__(self, message: str) -> None:
         self.message = message
 
+
 class InputError(PyriteError): ...
+
+
+class SolverError(PyriteError): ...
 
 
 def excepthook(exception_type, exception, traceback):

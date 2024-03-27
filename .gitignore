@@ -8,3 +8,5 @@ src/pyrite.egg-info/top_level.txt
 __pycache__
 *.pyc
 *.egg-info
+dist/
+build/

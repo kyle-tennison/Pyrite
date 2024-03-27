@@ -1,17 +1,21 @@
-from pyrite.datatypes import (
-    Node,
-    MATERIAL_ELASTICITY,
-    CROSS_AREA,
-    MatrixIndex,
-    Axis,
-    POISSON_RATIO,
-    PART_THICKNESS,
-)
+"""
+Element class for each triangular planar element. Contains code to compute
+strain-displacement and stress-strain matrices for each element, and 
+provides tools for indexing the element's global stiffness matrix.
+
+March 25, 2024
+Kyle Tennison
+"""
+
+from pyrite.datatypes import Node, MatrixIndex, Axis
 import numpy as np
-import math
 
 
 class Element:
+
+    poisson_ratio: float
+    part_thickness: float
+    material_elasticity: int
 
     def __init__(self, n1: Node, n2: Node, n3: Node):
         self.n1: Node = n1
@@ -29,7 +33,7 @@ class Element:
         self.row_indexes = []
         self.column_indexes = []
 
-        self.stress = 0
+        self.stress = 0.0
 
     def _check_ccw(self) -> None:
         """2D elements must be arranged counter-clockwise. Reassigns
@@ -70,7 +74,11 @@ class Element:
             dtype=float,
         )
 
-        B *= 1 / (2 * self.area)
+        # Prevent zero division
+        if self.area == 0:
+            B *= 0
+        else:
+            B *= 1 / (2 * self.area)
 
         return B
 
@@ -80,13 +88,13 @@ class Element:
 
         D = np.array(
             [
-                [1, POISSON_RATIO, 0],
-                [POISSON_RATIO, 1, 0],
-                [0, 0, (1 - POISSON_RATIO) / 2],
+                [1, self.poisson_ratio, 0],
+                [self.poisson_ratio, 1, 0],
+                [0, 0, (1 - self.poisson_ratio) / 2],
             ]
         )
 
-        D *= MATERIAL_ELASTICITY / (1 - POISSON_RATIO**2)
+        D *= self.material_elasticity / (1 - self.poisson_ratio**2)
 
         return D
 
@@ -111,10 +119,6 @@ class Element:
             MatrixIndex(self.n3, Axis.Y),
         ]
 
-        print(
-            f"info: calculating global stiffness matrix for ({self.n1.index},{self.n2.index},{self.n3.index})"
-        )
-
         return (
             (
                 (
@@ -124,7 +128,7 @@ class Element:
                 @ self.strain_displacement_matrix
             )
             * self.area
-            * PART_THICKNESS
+            * self.part_thickness
         )
 
     @property
@@ -151,14 +155,6 @@ class Element:
 
         else:
             return 0
-
-    @property
-    def perimeter(self) -> float:
-        """Returns the perimeter of the element"""
-
-        raise NotImplementedError()
-
-        return 0
 
     def __repr__(self) -> str:
         return f"Element({self.n1.index}, {self.n2.index}, {self.n3.index})"
