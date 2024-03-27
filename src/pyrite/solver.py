@@ -1,14 +1,18 @@
-from pyrite.datatypes import Node, DOF, PartMetadata
+"""
+Solves the finite element problem once elements and nodes have been generated.
+Assumes linear elastic behavior on an isotropic material.
+
+March 25, 2023
+Kyle Tennison
+"""
+
+from pyrite.datatypes import Node, DOF
 from pyrite.element import Element
 from pyrite.post_processor import PostProcessor
-from numba import jit
 
 from typing import Optional
 import math
 import numpy as np
-
-
-NO_DISPLAY = True
 
 
 def magnitude(vector: np.ndarray) -> float:
@@ -239,9 +243,8 @@ class Solver:
             unknown_matrix, (known_forces + known_matrix_summed)
         )
 
-        if not NO_DISPLAY:
-            print("known forces:\n", known_forces)
-            print("known matrix summed:\n", known_matrix_summed)
+        # print("known forces:\n", known_forces)
+        # print("known matrix summed:\n", known_matrix_summed)
 
         if displacement_solution is None:
             raise Exception("No solution.")
@@ -264,11 +267,10 @@ class Solver:
 
                 nodal_forces[i] = solved_force
 
-        if not NO_DISPLAY:
-            print("The solved matrix is:")
-            self.display_total_matrix(
-                nodal_forces, nodal_displacements, total_stiffness_matrix
-            )
+        # print("The solved matrix is:")
+        # self.display_total_matrix(
+        #     nodal_forces, nodal_displacements, total_stiffness_matrix
+        # )
 
     def run(self, nodes: list[Node], elements: list[Element]):
         """Runs the FEA simulation for a set of given nodes and elements.
@@ -302,11 +304,10 @@ class Solver:
         nodal_displacements = self.calculate_displacement_vector(self.nodes)
 
         # Display pre-solved matrix
-        if not NO_DISPLAY:
-            print("info: the total matrix is:")
-            self.display_total_matrix(
-                nodal_forces, nodal_displacements, total_stiffness_matrix
-            )
+        # print("info: the total matrix is:")
+        # self.display_total_matrix(
+        #     nodal_forces, nodal_displacements, total_stiffness_matrix
+        # )
 
         # Solve matrix
         try:

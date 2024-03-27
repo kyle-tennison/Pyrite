@@ -1,23 +1,25 @@
+"""
+Miscellaneous datatypes used in Pyrite
+
+Kyle Tennison
+March 20, 2024
+"""
+
 from dataclasses import dataclass
 from typing import Optional
 from enum import Enum
 
 DOF = 2
-
-
-# MATERIAL_ELASTICITY = 30e6
-# POISSON_RATIO = 0.25  # poisson ratio
-# PART_THICKNESS = 0.5
-
-
 @dataclass 
 class PartMetadata:
+    """Contains metadata defined in input json"""
     material_elasticity: int
     poisson_ratio: float
     part_thickness: float
 
 @dataclass
 class Node:
+    """Represents a node in the mesh"""
     x: float
     y: float
     ux: Optional[float]
@@ -31,19 +33,13 @@ class Node:
 
 
 class Axis(Enum):
+    """Different axes available"""
     X = 0
     Y = 1
     Z = 2
 
-
-class BoundaryTarget(Enum):
-    UX = "ux"
-    UY = "uy"
-    FX = "fx"
-    FY = "fy"
-
-
 class MshState(Enum):
+    """Different states the MeshParser may be in"""
     NODES = 0
     ELEMENTS = 1
     ENTITIES = 2
@@ -52,15 +48,12 @@ class MshState(Enum):
 
 @dataclass
 class MatrixIndex:
+    """Used to index a stiffness matrix given a node and axis"""
     node: Node
     axis: Axis
 
-    def to_num(self):
-        """Converts the index to the corresponding number in the TSM"""
+    def to_num(self) -> int:
+        """Converts the index to the corresponding number in the total 
+        stiffness matrix.
+        """
         return (2 * self.node.index) + (1 if self.axis == Axis.Y else 0)
-
-
-@dataclass
-class ElementLight:
-    n1: Node
-    n2: Node

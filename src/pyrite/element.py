@@ -1,10 +1,18 @@
+"""
+Element class for each triangular planar element. Contains code to compute
+strain-displacement and stress-strain matrices for each element, and 
+provides tools for indexing the element's global stiffness matrix.
+
+March 25, 2024
+Kyle Tennison
+"""
+
 from pyrite.datatypes import (
     Node,
     MatrixIndex,
     Axis,
 )
 import numpy as np
-import math
 
 
 class Element:
@@ -29,7 +37,7 @@ class Element:
         self.row_indexes = []
         self.column_indexes = []
 
-        self.stress = 0
+        self.stress = 0.0
 
     def _check_ccw(self) -> None:
         """2D elements must be arranged counter-clockwise. Reassigns

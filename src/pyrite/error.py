@@ -1,5 +1,11 @@
-import sys
+"""
+Custom Error Handling. Omits traceback for custom errors.
 
+March 26, 2024
+Kyle Tennison
+"""
+
+import sys
 class PyriteError(Exception): 
 
     def __init__(self, message: str) -> None:

@@ -1,16 +1,22 @@
-import json
-import os
-from typing import Callable
-from matplotlib import pyplot as plt
+"""
+Meshing utility build around Gmsh. Handles mesh generation and boundary
+condition application.
+
+March 25, 2024
+Kyle Tennison
+"""
+
 from pyrite.datatypes import Node, MshState, PartMetadata
 from pyrite.element import Element
 from pyrite.error import InputError
 
-from scipy.spatial import Delaunay
-import numpy as np
-from itertools import combinations
-import subprocess
 from matplotlib.patches import Polygon
+from matplotlib import pyplot as plt
+import json
+import os
+from typing import Callable
+import numpy as np
+import subprocess
 
 
 def try_float(string: str):

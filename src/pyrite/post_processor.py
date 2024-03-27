@@ -1,11 +1,17 @@
-import math
+"""
+Post-processor to solve for planar stresses and display results
 
-from matplotlib.patches import Polygon
+Kyle Tennison
+March 24, 2024
+"""
+
 from pyrite.datatypes import Node, DOF
 from pyrite.element import Element
 
-import numpy as np
+from matplotlib.patches import Polygon
 import matplotlib.pyplot as plt
+import numpy as np
+import math
 
 
 class PostProcessor:
