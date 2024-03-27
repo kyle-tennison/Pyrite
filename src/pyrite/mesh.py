@@ -120,7 +120,7 @@ class Mesher:
         output_file: str,
         characteristic_length: float,
         characteristic_length_variance: float,
-    ):
+    ) -> None:
         """Generates a .geo file from a list of vertices.
 
         Args:
@@ -130,13 +130,12 @@ class Mesher:
             characteristic_length: The mean characteristic element length
             characteristic_length_variance: The ± variance allowed
                 in the characteristic length.
-
         """
 
         ELEMENT_ORDER = 1
         ALGORITHM = 1  # delaunay
 
-        with open("geom.geo", "w") as f:
+        with open(output_file, "w") as f:
 
             # define points
             f.write("// Define Points\n")
@@ -173,11 +172,12 @@ class Mesher:
             )
             f.write(f"Mesh 2;\n")
 
-    def _compute_mesh(self, geo_file: str, output_file: str = "output.msh"):
-        """Runs gmsh to compute mesh from .geo file
+    def _compute_mesh(self, geo_file: str, output_file: str = "output.msh") -> None:
+        """Runs Gmsh to compute mesh from .geo file
 
         Args:
             geo_file: The .geo file to target
+            output_file: The output .msh file. Defaults to 'output.msh'
         """
 
         try:
@@ -186,7 +186,7 @@ class Mesher:
             raise RuntimeError(f"Failed to generate mesh: {str(e)}")
 
     def _parse_mesh(self, mesh_file: str) -> tuple[list[Node], list[Element]]:
-        """Parses a mesh file, building nodes and elements.
+        """Parses a .msh file, building nodes and elements.
 
         Args:
             mesh_file: The .msh file to target
@@ -350,7 +350,7 @@ class Mesher:
         plt.show()
 
     def _parse_csv(self, input_file: str) -> list[tuple]:
-        """Parses input CSV that contains vertices
+        """Parses CSV of vertices into a list of (x,y) tuples
 
         Args:
             input_file: The filepath of the CSV file to reference
@@ -361,26 +361,36 @@ class Mesher:
 
         vertices = []
 
-        with open(input_file, "r") as f:
+        try:
+            with open(input_file, "r") as f:
 
-            headers = [i.strip() for i in f.readline().strip().split(",")]
+                headers = [i.strip() for i in f.readline().strip().split(",")]
 
-            for line in [i.strip().split(",") for i in f.readlines()]:
+                for line in [i.strip().split(",") for i in f.readlines()]:
 
-                x = float(line[headers.index("x")])
-                y = float(line[headers.index("y")])
-                ux = try_float(line[headers.index("ux")])
-                uy = try_float(line[headers.index("uy")])
-                fx = try_float(line[headers.index("fx")])
-                fy = try_float(line[headers.index("fy")])
+                    x = float(line[headers.index("x")])
+                    y = float(line[headers.index("y")])
+                    ux = try_float(line[headers.index("ux")])
+                    uy = try_float(line[headers.index("uy")])
+                    fx = try_float(line[headers.index("fx")])
+                    fy = try_float(line[headers.index("fy")])
 
-                vertices.append((x, y, ux, uy, fx, fy))
+                    vertices.append((x, y, ux, uy, fx, fy))
+        except Exception as e:
+            raise InputError(f"Error in vertex file: {type(e).__name__}{str(e)}")
 
         return vertices
     
 
     def _load_metadata(self, input_file: str) -> PartMetadata:
-        """Loads the metadata from the input file"""
+        """Loads the metadata from the input file.
+        
+        Args:
+            input_file: The input json to load
+        
+        Returns:
+            A PartMetadata object that contains the loaded metadata
+        """
 
         with open(input_file, "r") as f:
             try:
@@ -434,16 +444,19 @@ class Mesher:
 
     def mesh(
         self,
-        input_csv: str,
+        vertex_csv: str,
         input_file: str,
         characteristic_length: float,
         characteristic_length_variance: float,
     ) -> tuple[list[Node], list[Element]]:
-        """Creates a mesh from a list of 2D vertices
+        """Meshes geometry from vertices csv and loads results into nodes and
+        elements. Applies boundary conditions from input json.
 
         Args:
-            input_csv: The filepath to the input CSV that contains a list of
+            vertex_csv: The filepath to the input CSV that contains a list of
                 vertices
+            input_file: The filepath to the input json that defines
+                boundary conditions and geometry metadata
             characteristic_length: The mean characteristic element length.
             characteristic_length_variance: The ± variance allowed
                 in the characteristic length.
@@ -455,10 +468,10 @@ class Mesher:
         if not os.path.exists(input_file):
             raise InputError(f"Could not find input file at {os.path.abspath(input_file)}")
         
-        if not os.path.exists(input_csv):
-            raise InputError(f"Could not find vertices csv at {os.path.abspath(input_csv)}")
+        if not os.path.exists(vertex_csv):
+            raise InputError(f"Could not find vertices csv at {os.path.abspath(vertex_csv)}")
 
-        vertices = self._parse_csv(input_csv)
+        vertices = self._parse_csv(vertex_csv)
 
         geo_filename = "geom.geo"
         mesh_filename = "geom.msh"
@@ -479,4 +492,5 @@ class Mesher:
         # cleanup files
         os.remove(geo_filename)
         os.remove(mesh_filename)
+        
         return nodes, elements

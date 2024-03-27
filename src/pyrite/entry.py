@@ -6,8 +6,6 @@ March 26, 2024
 """
 
 import argparse
-import os
-
 from pyrite.solver import Solver
 from pyrite.mesh import Mesher
 
@@ -33,7 +31,7 @@ def entry():
     mesher = Mesher()
 
     nodes, elements = mesher.mesh(
-        input_csv=args.vertices,
+        vertex_csv=args.vertices,
         input_file=args.boundary,
         characteristic_length=args.characteristic_length,
         characteristic_length_variance=args.characteristic_length_variance,

@@ -13,6 +13,7 @@ class PyriteError(Exception):
 
 class InputError(PyriteError): ...
 
+class SolverError(PyriteError): ...
 
 def excepthook(exception_type, exception, traceback):
 
