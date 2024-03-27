@@ -1,15 +1,10 @@
 import math
 
-from matplotlib.colors import rgb2hex
 from matplotlib.patches import Polygon
 from pyrite.datatypes import Node, DOF
-from pyrite.mesh import try_float
 from pyrite.element import Element
 
 import numpy as np
-import csv
-import numpy as np
-from scipy.spatial import Delaunay
 import matplotlib.pyplot as plt
 
 
@@ -71,6 +66,10 @@ class PostProcessor:
         Returns:
             A string representing the RGB color in hexadecimal format.
         """
+
+        if max_value == min_value:
+            return "#4C4C4C"
+
         norm_value = (value - min_value) / (max_value - min_value)
 
         blue = 0.0
@@ -170,7 +169,7 @@ class PostProcessor:
                 triangle, closed=True, edgecolor="black", linewidth=0.2, alpha=0.7
             )
 
-            polygon.set_facecolor((0.3, 0.3, 0.3))
+            polygon.set_facecolor("#4C4C4C")
 
             initial_plot.add_patch(polygon)
 

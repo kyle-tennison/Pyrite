@@ -11,3 +11,6 @@ version = "0.0.1"
 [[project.authors]]
 name = "Kyle Tennison"
 email = "kyletennison05@gmail.com"
+
+[project.scripts]
+pyrite = "pyrite.entry:entry"

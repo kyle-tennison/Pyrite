@@ -4,6 +4,7 @@ from typing import Callable
 from matplotlib import pyplot as plt
 from pyrite.datatypes import Node, MshState, BoundaryTarget
 from pyrite.element import Element
+from pyrite.error import InputError
 
 from scipy.spatial import Delaunay
 import numpy as np
@@ -399,13 +400,17 @@ class Mesher:
         with open(boundary_file, "r") as f:
             boundary_file_data = json.load(f)
 
-        for check_name, check_data in boundary_file_data.items():
+        try:
+            for check_name, check_data in boundary_file_data.items():
 
-            region = check_data["region"]
-            targets = check_data["targets"]
+                region = check_data["region"]
+                targets = check_data["targets"]
 
-            rule = BoundaryRule(check_name, targets, region)
-            boundary_rules.append(rule)
+                rule = BoundaryRule(check_name, targets, region)
+                boundary_rules.append(rule)
+        except KeyError as e:
+            raise InputError(f"Error in boundary file: Missing key {str(e)}")
+
 
         for node in nodes:
             for rule in boundary_rules:
