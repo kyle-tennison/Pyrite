@@ -37,6 +37,10 @@ Pyrite takes the following steps to arrive at a static mechanical solution:
 5. Using numpy's `linalg` module, Pyrite sets up the finite element equation and solves for unknown nodal forces and displacements.
 6. The solution is plotted next to the initial model using matplotlib.
 
+## Examples
+
+This repo contains two examples in the `examples/` dir. 
+
 ## Limitations
 
 - Python is slow, and moderately large models will solve very slowly. Pyrite is a prototype for a much more performant solver I am planning to build in Rust.
