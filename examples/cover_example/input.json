@@ -1,34 +1,33 @@
 {
-    "metadata": {
-      "part_thickness": 0.5,
-      "material_elasticity": 69e9,
-      "poisson_ratio": 0.33
-    },
-    "boundary_conditions": {
-      "restraint": {
-        "region": {
-          "y_target_min": -240,
-          "y_target_max": -220
-        },
-        "targets": {
-          "ux": 0,
-          "uy": 0,
-          "fx": null,
-          "fy": null
-        }
+  "metadata": {
+    "part_thickness": 0.5,
+    "material_elasticity": 69e9,
+    "poisson_ratio": 0.33
+  },
+  "boundary_conditions": {
+    "restraint": {
+      "region": {
+        "y_target_min": -240,
+        "y_target_max": -220
       },
-      "load": {
-        "region": {
-          "y_target_min": -20,
-          "y_target_max": 3
-        },
-        "targets": {
-          "ux": null,
-          "uy": null,
-          "fx": 0,
-          "fy": 5e7
-        }
+      "targets": {
+        "ux": 0,
+        "uy": 0,
+        "fx": null,
+        "fy": null
+      }
+    },
+    "load": {
+      "region": {
+        "y_target_min": -20,
+        "y_target_max": 3
+      },
+      "targets": {
+        "ux": null,
+        "uy": null,
+        "fx": 0,
+        "fy": 5e7
       }
     }
   }
-  
+}

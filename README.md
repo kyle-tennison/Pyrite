@@ -1,9 +1,8 @@
 # Pyrite
 
-A 2D linear-elastic FEA program for isotropic materials built in Python. 
+A 2D linear-elastic FEA program for isotropic materials built in Python.
 
 ![A screenshot of the Pyrite output](screenshot.png)
-
 
 ## Installation & Running
 
@@ -25,7 +24,7 @@ For help with more commands, run:
 pyrite -h
 ```
 
-## About 
+## About
 
 I built Pyrite to learn more about the finite element method. It's aim isn't to be exceptionally performant—it's mainly about getting all the pieces connected.
 
@@ -38,7 +37,7 @@ Pyrite takes the following steps to arrive at a static mechanical solution:
 5. Using numpy's `linalg` module, Pyrite sets up the finite element equation and solves for unknown nodal forces and displacements.
 6. The solution is plotted next to the initial model using matplotlib.
 
-## Limitations 
+## Limitations
 
 - Python is slow, and moderately large models will solve very slowly. Pyrite is a prototype for a much more performant solver I am planning to build in Rust.
 
