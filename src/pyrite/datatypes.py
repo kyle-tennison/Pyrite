@@ -1,16 +1,20 @@
 from dataclasses import dataclass
-from enum import Enum
-import math
 from typing import Optional
+from enum import Enum
 
-import numpy as np
-
-CROSS_AREA = 10
-MATERIAL_ELASTICITY = 30e6
-POISSON_RATIO = 0.25  # poisson ratio
 DOF = 2
-PART_THICKNESS = 0.5
 
+
+# MATERIAL_ELASTICITY = 30e6
+# POISSON_RATIO = 0.25  # poisson ratio
+# PART_THICKNESS = 0.5
+
+
+@dataclass 
+class PartMetadata:
+    material_elasticity: int
+    poisson_ratio: float
+    part_thickness: float
 
 @dataclass
 class Node:

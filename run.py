@@ -7,7 +7,7 @@ mesher = Mesher()
 
 nodes, elements = mesher.mesh(
     input_csv="vertices.csv",
-    boundary_file="boundary.json",
+    input_file="boundary.json",
     characteristic_length=0.5,
     characteristic_length_variance=0.06,
 )

@@ -1,4 +1,4 @@
-from pyrite.datatypes import Node, MatrixIndex, Axis, DOF
+from pyrite.datatypes import Node, DOF, PartMetadata
 from pyrite.element import Element
 from pyrite.post_processor import PostProcessor
 from numba import jit
@@ -18,6 +18,9 @@ def magnitude(vector: np.ndarray) -> float:
 
 
 class Solver:
+    """
+    This class contains tools to solve the FEM equations.
+    """
 
     def __init__(self):
         self.nodes: list[Node] = []
@@ -40,7 +43,7 @@ class Solver:
 
         print("info: building total stiffness matrix:")
         for i, element in enumerate(elements):
-            print(f"{100*(i/(len(elements)-1)):.3f}%", end="\r")
+            print(f"{100*(i/(len(elements)-1)):.3f}%")
 
             element.global_stiffness_matrix
 
@@ -55,34 +58,6 @@ class Solver:
                     total_stiffness_matrix[row_num, col_num] += value
 
         return total_stiffness_matrix
-
-        # node_stack = []
-
-        # for node in nodes:
-        #     node_stack.append(MatrixIndex(node, Axis.X))
-        #     node_stack.append(MatrixIndex(node, Axis.Y))
-
-        # row_stack = node_stack.copy()
-        # row = 0
-        # while row_stack:
-        #     n1 = row_stack.pop(0)
-
-        #     column_stack = node_stack.copy()
-        #     column = 0
-        #     while column_stack:
-        #         n2 = column_stack.pop(0)
-
-        #         ki = 0
-        #         for element in elements:
-        #             ki += element.index_GSM(n1, n2)
-
-        #         total_stiffness_matrix[row, column] = ki
-
-        #         column += 1
-
-        #     row += 1
-
-        # return total_stiffness_matrix
 
     def calculate_force_vector(self, nodes: list[Node]) -> np.ndarray:
         """Calculates column vector of forces."""

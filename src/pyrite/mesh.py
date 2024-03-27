@@ -2,7 +2,7 @@ import json
 import os
 from typing import Callable
 from matplotlib import pyplot as plt
-from pyrite.datatypes import Node, MshState, BoundaryTarget
+from pyrite.datatypes import Node, MshState, PartMetadata
 from pyrite.element import Element
 from pyrite.error import InputError
 
@@ -37,6 +37,7 @@ class BoundaryRule:
         self.checks: list[Callable] = []
         self.targets = targets
         self._region = region
+        self.part_metadata: PartMetadata
 
         self._parse_region(region)
 
@@ -125,30 +126,6 @@ class Mesher:
                 in the characteristic length.
 
         """
-
-        # # Register groups that elements may belong to
-        # displacement_groups = ({}, {})
-        # force_groups = ({}, {})
-
-        # for x, y, ux, uy, fx, fy in outer_vertices:
-
-        #     if ux not in displacement_groups[0] and not np.isnan(ux):
-        #         displacement_groups[0][f"nodal_displacement_x_{ux}"] = []
-
-        #     if uy not in displacement_groups[1] and not np.isnan(uy):
-        #         displacement_groups[1][f"nodal_displacement_y_{uy}"] = []
-
-        #     if fx not in force_groups[0] and not np.isnan(fx):
-        #         force_groups[0][f"nodal_displacement_x_{fx}"] = []
-
-        #     if fy not in force_groups[1] and not np.isnan(fy):
-        #         force_groups[1][f"nodal_displacement_y_{fy}"] = []
-
-        # # add nan placeholders
-        # displacement_groups[0]["nodal_displacement_x_nan"] = []
-        # displacement_groups[1]["nodal_displacement_y_nan"] = []
-        # force_groups[0]["nodal_force_x_nan"] = []
-        # force_groups[1]["nodal_force_y_nan"] = []
 
         ELEMENT_ORDER = 1
         ALGORITHM = 1  # delaunay
@@ -306,6 +283,10 @@ class Mesher:
                                 element_tag, n1, n2, n3 = data
                                 triangles.append((n1, n2, n3))
 
+        Element.material_elasticity = self.part_metadata.material_elasticity
+        Element.poisson_ratio = self.part_metadata.poisson_ratio
+        Element.part_thickness = self.part_metadata.part_thickness
+        
         elements: list[Element] = []
         for n1_idx, n2_idx, n3_idx in triangles:
             n1 = nodes[n1_idx - 1]
@@ -390,18 +371,48 @@ class Mesher:
                 vertices.append((x, y, ux, uy, fx, fy))
 
         return vertices
+    
 
-    def _register_boundary_conditions(self, boundary_file: str, nodes: list[Node]):
-        """Registers the boundary conditions set in a boundary file."""
+    def _load_metadata(self, input_file: str) -> PartMetadata:
+        """Loads the metadata from the input file"""
 
-        boundary_file_data = {}
-        boundary_rules: list[BoundaryRule] = []
-
-        with open(boundary_file, "r") as f:
-            boundary_file_data = json.load(f)
+        with open(input_file, "r") as f:
+            try:
+                input_file_data = json.load(f)
+            except json.JSONDecodeError as e:
+                raise InputError(f"Error in input file json: {str(e)}")
 
         try:
-            for check_name, check_data in boundary_file_data.items():
+            metadata = input_file_data["metadata"]
+
+            material_elasticity = metadata["material_elasticity"]
+            poisson_ratio = metadata["poisson_ratio"]
+            part_thickness = metadata["part_thickness"]
+
+            return PartMetadata(
+                material_elasticity, poisson_ratio, part_thickness
+            )
+        except KeyError as e:
+            raise InputError(f"Input file missing field {str(e)}")
+        
+
+    def _apply_boundary_conditions(self, input_file: str, nodes: list[Node]):
+        """Applies boundary conditions from the input file onto a list of nodes
+        
+        Args:
+            input_file: The path to the input file
+            nodes: A list of nodes from the mesh to apply the boundary conditions   
+                to.
+        """
+
+        input_file_data = {}
+        boundary_rules: list[BoundaryRule] = []
+
+        with open(input_file, "r") as f:
+            input_file_data = json.load(f)
+
+        try:
+            for check_name, check_data in input_file_data["boundary_conditions"].items():
 
                 region = check_data["region"]
                 targets = check_data["targets"]
@@ -409,8 +420,7 @@ class Mesher:
                 rule = BoundaryRule(check_name, targets, region)
                 boundary_rules.append(rule)
         except KeyError as e:
-            raise InputError(f"Error in boundary file: Missing key {str(e)}")
-
+            raise InputError(f"Input file missing field {str(e)}")
 
         for node in nodes:
             for rule in boundary_rules:
@@ -419,7 +429,7 @@ class Mesher:
     def mesh(
         self,
         input_csv: str,
-        boundary_file: str,
+        input_file: str,
         characteristic_length: float,
         characteristic_length_variance: float,
     ) -> tuple[list[Node], list[Element]]:
@@ -436,10 +446,18 @@ class Mesher:
             A list of Nodes and Elements
         """
 
+        if not os.path.exists(input_file):
+            raise InputError(f"Could not find input file at {os.path.abspath(input_file)}")
+        
+        if not os.path.exists(input_csv):
+            raise InputError(f"Could not find vertices csv at {os.path.abspath(input_csv)}")
+
         vertices = self._parse_csv(input_csv)
 
         geo_filename = "geom.geo"
         mesh_filename = "geom.msh"
+
+        self.part_metadata = self._load_metadata(input_file)
 
         self._generate_geo(
             vertices,
@@ -450,7 +468,7 @@ class Mesher:
         self._compute_mesh(geo_filename, mesh_filename)
         nodes, elements = self._parse_mesh(mesh_filename)
 
-        self._register_boundary_conditions(boundary_file, nodes)
+        self._apply_boundary_conditions(input_file, nodes)
 
         # cleanup files
         os.remove(geo_filename)

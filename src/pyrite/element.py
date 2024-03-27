@@ -1,17 +1,17 @@
 from pyrite.datatypes import (
     Node,
-    MATERIAL_ELASTICITY,
-    CROSS_AREA,
     MatrixIndex,
     Axis,
-    POISSON_RATIO,
-    PART_THICKNESS,
 )
 import numpy as np
 import math
 
 
 class Element:
+
+    poisson_ratio: float 
+    part_thickness: float
+    material_elasticity: int
 
     def __init__(self, n1: Node, n2: Node, n3: Node):
         self.n1: Node = n1
@@ -80,13 +80,13 @@ class Element:
 
         D = np.array(
             [
-                [1, POISSON_RATIO, 0],
-                [POISSON_RATIO, 1, 0],
-                [0, 0, (1 - POISSON_RATIO) / 2],
+                [1, self.poisson_ratio, 0],
+                [self.poisson_ratio, 1, 0],
+                [0, 0, (1 - self.poisson_ratio) / 2],
             ]
         )
 
-        D *= MATERIAL_ELASTICITY / (1 - POISSON_RATIO**2)
+        D *= self.material_elasticity / (1 - self.poisson_ratio**2)
 
         return D
 
@@ -124,7 +124,7 @@ class Element:
                 @ self.strain_displacement_matrix
             )
             * self.area
-            * PART_THICKNESS
+            * self.part_thickness
         )
 
     @property
