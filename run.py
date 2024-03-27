@@ -5,9 +5,11 @@ from pyrite.mesh import Mesher
 solver = Solver()
 mesher = Mesher()
 
-elements, nodes = mesher.parse_nodes("nodes.csv")
-
-for node in nodes:
-    print(str(node))
+nodes, elements = mesher.mesh(
+    input_csv="vertices.csv",
+    boundary_file="boundary.json",
+    characteristic_length=0.5,
+    characteristic_length_variance=0.06,
+)
 
 solver.run(nodes, elements)

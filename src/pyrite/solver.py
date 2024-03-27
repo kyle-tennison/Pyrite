@@ -1,10 +1,14 @@
-from pyrite.datatypes import Node, MatrixIndex, Axis, DOF, Element
+from pyrite.datatypes import Node, MatrixIndex, Axis, DOF
+from pyrite.element import Element
 from pyrite.post_processor import PostProcessor
-
+from numba import jit
 
 from typing import Optional
 import math
 import numpy as np
+
+
+NO_DISPLAY = True
 
 
 def magnitude(vector: np.ndarray) -> float:
@@ -30,35 +34,55 @@ class Solver:
             A 2D matrix containing the matrix
         """
 
-        total_stiffness_matrix = np.zeros((DOF * len(nodes), DOF * len(nodes)))
+        n = DOF * len(nodes)
 
-        node_stack = []
+        total_stiffness_matrix = np.zeros((n, n))
 
-        for node in nodes:
-            node_stack.append(MatrixIndex(node, Axis.X))
-            node_stack.append(MatrixIndex(node, Axis.Y))
+        print("info: building total stiffness matrix:")
+        for i, element in enumerate(elements):
+            print(f"{100*(i/(len(elements)-1)):.3f}%", end="\r")
 
-        row_stack = node_stack.copy()
-        row = 0
-        while row_stack:
-            n1 = row_stack.pop(0)
+            element.global_stiffness_matrix
 
-            column_stack = node_stack.copy()
-            column = 0
-            while column_stack:
-                n2 = column_stack.pop(0)
+            for row_index in element.row_indexes:
+                for col_index in element.column_indexes:
 
-                ki = 0
-                for element in elements:
-                    ki += element.index_GSM(n1, n2)
+                    row_num = row_index.to_num()
+                    col_num = col_index.to_num()
 
-                total_stiffness_matrix[row, column] = ki
+                    value = element.index_GSM(row_index, col_index)
 
-                column += 1
-
-            row += 1
+                    total_stiffness_matrix[row_num, col_num] += value
 
         return total_stiffness_matrix
+
+        # node_stack = []
+
+        # for node in nodes:
+        #     node_stack.append(MatrixIndex(node, Axis.X))
+        #     node_stack.append(MatrixIndex(node, Axis.Y))
+
+        # row_stack = node_stack.copy()
+        # row = 0
+        # while row_stack:
+        #     n1 = row_stack.pop(0)
+
+        #     column_stack = node_stack.copy()
+        #     column = 0
+        #     while column_stack:
+        #         n2 = column_stack.pop(0)
+
+        #         ki = 0
+        #         for element in elements:
+        #             ki += element.index_GSM(n1, n2)
+
+        #         total_stiffness_matrix[row, column] = ki
+
+        #         column += 1
+
+        #     row += 1
+
+        # return total_stiffness_matrix
 
     def calculate_force_vector(self, nodes: list[Node]) -> np.ndarray:
         """Calculates column vector of forces."""
@@ -181,19 +205,6 @@ class Solver:
 
         return known_matrix, unknown_matrix
 
-    def _load_elements(self, element_pairs: list[tuple[int, int]]) -> list[Element]:
-        """Loads element objects from each element pair"""
-
-        element_objects: list[Element] = []
-
-        for n1_index, n2_index in element_pairs:
-            n1 = self.nodes[n1_index]
-            n2 = self.nodes[n2_index]
-
-            element_objects.append(Element(n1, n2))
-
-        return element_objects
-
     @staticmethod
     def redundant_solve(A, b) -> Optional[np.ndarray]:
         """
@@ -213,7 +224,6 @@ class Solver:
         except np.linalg.LinAlgError:
             # If singular, use the pseudoinverse
             return np.linalg.pinv(A) @ b
-        
 
     def solve(
         self,
@@ -245,16 +255,18 @@ class Solver:
         known_forces = np.array([i for i in nodal_forces if not np.isnan(i)]).reshape(
             num_unknown_displacements, 1
         )
-        print("known forces:\n", known_forces)
 
         known_matrix_summed = np.array([sum(i) for i in known_matrix]).reshape(
             (num_unknown_displacements, 1)
         )
-        print("known matrix summed:\n", known_matrix_summed)
 
         displacement_solution = self.redundant_solve(
             unknown_matrix, (known_forces + known_matrix_summed)
         )
+
+        if not NO_DISPLAY:
+            print("known forces:\n", known_forces)
+            print("known matrix summed:\n", known_matrix_summed)
 
         if displacement_solution is None:
             raise Exception("No solution.")
@@ -277,12 +289,13 @@ class Solver:
 
                 nodal_forces[i] = solved_force
 
-        print("The solved matrix is:")
-        self.display_total_matrix(
-            nodal_forces, nodal_displacements, total_stiffness_matrix
-        )
+        if not NO_DISPLAY:
+            print("The solved matrix is:")
+            self.display_total_matrix(
+                nodal_forces, nodal_displacements, total_stiffness_matrix
+            )
 
-    def run(self, nodes: list[Node], elements: list[tuple[int, int]]):
+    def run(self, nodes: list[Node], elements: list[Element]):
         """Runs the FEA simulation for a set of given nodes and elements.
         Runs post-processor when complete.
 
@@ -294,57 +307,46 @@ class Solver:
 
         # Load nodes and elements
         self.nodes = nodes
-        self.elements = self._load_elements(elements)
+        self.elements = elements
 
-        for element in self.elements:
-            print(element.element_angle)
+        print("info: loaded the following elements")
+        for element in elements:
+            print(f"\t- {element}")
 
-        # nodes = {
-        #     1: Node(x=0, y=0, ux=None, uy=0, Fx=0, Fy=None, id=1),
-        #     2: Node(
-        #         x=0.5,
-        #         y=math.sin(math.radians(60)),
-        #         ux=None,
-        #         uy=None,
-        #         Fx=0,
-        #         Fy=-100,
-        #         id=2,
-        #     ),
-        #     3: Node(x=1, y=0, ux=0, uy=0, Fx=None, Fy=None, id=3),
-        # }
-
-        # elements = {
-        #     1: Element(nodes[1], nodes[2]),
-        #     2: Element(nodes[2], nodes[3]),
-        #     3: Element(nodes[1], nodes[3]),
-        # }
+        print(f"\ninfo: {len(elements)} total elements")
 
         # Create total stiffness matrix from nodes and elements
+        print("info: assembling total stiffness matrix")
         total_stiffness_matrix = self.create_total_stiffness_matrix(
             self.nodes, self.elements
         )
 
         # Create nodal forces/displacement vectors
+        print("info: assembling column vectors")
         nodal_forces = self.calculate_force_vector(self.nodes)
         nodal_displacements = self.calculate_displacement_vector(self.nodes)
 
         # Display pre-solved matrix
-        print("The total matrix is:")
-        self.display_total_matrix(
-            nodal_forces, nodal_displacements, total_stiffness_matrix
-        )
+        if not NO_DISPLAY:
+            print("info: the total matrix is:")
+            self.display_total_matrix(
+                nodal_forces, nodal_displacements, total_stiffness_matrix
+            )
 
         # Solve matrix
         try:
+            print("info: solving system...")
             self.solve(nodal_forces, nodal_displacements, total_stiffness_matrix)
         except Exception as e:
-            print(f"solve failed: {e}")
+            print(f"error: solve failed: {e}")
             raise
 
         # Load nodal displacements into each element object
 
         post_processor = PostProcessor()
-        post_processor.load_displacements_into_elements(nodal_displacements, self.elements)
-        post_processor.compute_strain(self.elements)
+        post_processor.load_displacements_into_elements(
+            nodal_displacements, self.elements
+        )
+        post_processor.compute_stress(self.elements)
         post_processor.output_solved(nodal_forces, nodal_displacements, nodes)
         post_processor.show("nodes.csv", self.elements)
