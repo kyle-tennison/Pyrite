@@ -6,6 +6,7 @@ March 25, 2023
 Kyle Tennison
 """
 
+from tqdm import tqdm
 from pyrite.datatypes import Node, DOF
 from pyrite.element import Element
 from pyrite.post_processor import PostProcessor
@@ -45,9 +46,10 @@ class Solver:
 
         total_stiffness_matrix = np.zeros((n, n))
 
-        print("info: building total stiffness matrix:")
-        for i, element in enumerate(elements):
-            print(f"{100*(i/(len(elements)-1)):.3f}%")
+        for element in tqdm(elements, "info: building element stiffness matrices"):
+            element.global_stiffness_matrix # call property to prevent re-calculations
+
+        for element in tqdm(elements, "info: building total stiffness matrix"):
 
             element.global_stiffness_matrix
 
@@ -285,10 +287,6 @@ class Solver:
         # Load nodes and elements
         self.nodes = nodes
         self.elements = elements
-
-        print("info: loaded the following elements")
-        for element in elements:
-            print(f"\t- {element}")
 
         print(f"\ninfo: {len(elements)} total elements")
 

@@ -119,10 +119,6 @@ class Element:
             MatrixIndex(self.n3, Axis.Y),
         ]
 
-        print(
-            f"info: calculating global stiffness matrix for ({self.n1.index},{self.n2.index},{self.n3.index})"
-        )
-
         return (
             (
                 (
