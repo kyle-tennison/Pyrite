@@ -35,8 +35,6 @@ class Mesh:
 
 class BoundaryRule:
 
-    SUPPORTED_TARGETS = ("ux", "uy", "fx", "fy")
-
     def __init__(self, name: str, targets: dict[str, float], region: dict[str, float]):
 
         self.name = name
@@ -83,11 +81,14 @@ class BoundaryRule:
             node: The node to modify
         """
 
-        if self.check(node):
-            node.ux = self.targets["ux"]
-            node.uy = self.targets["uy"]
-            node.Fx = self.targets["fx"]
-            node.Fy = self.targets["fy"]
+        try:
+            if self.check(node):
+                node.ux = self.targets["ux"]
+                node.uy = self.targets["uy"]
+                node.Fx = self.targets["fx"]
+                node.Fy = self.targets["fy"]
+        except KeyError as e:
+            raise InputError(f"Input file missing target '{str(e)}'")
 
     def check(self, point) -> bool:
         """Runs a point through all the checks for the boundary rule.

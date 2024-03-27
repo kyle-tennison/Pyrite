@@ -7,11 +7,7 @@ March 25, 2024
 Kyle Tennison
 """
 
-from pyrite.datatypes import (
-    Node,
-    MatrixIndex,
-    Axis,
-)
+from pyrite.datatypes import Node, MatrixIndex, Axis
 import numpy as np
 
 
@@ -155,14 +151,6 @@ class Element:
 
         else:
             return 0
-
-    @property
-    def perimeter(self) -> float:
-        """Returns the perimeter of the element"""
-
-        raise NotImplementedError()
-
-        return 0
 
     def __repr__(self) -> str:
         return f"Element({self.n1.index}, {self.n2.index}, {self.n3.index})"
