@@ -12,6 +12,8 @@ You can install pyrite with
 pip install .
 ```
 
+You will also need [Gmsh](https://gmsh.info/#Download) installed on your machine.
+
 Afterwards, you can run pyrite with:
 
 ```
