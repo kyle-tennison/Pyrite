@@ -47,7 +47,7 @@ This repo contains two examples in the `examples/` dir.
 
 - Python is slow, and moderately large models will solve very slowly. Pyrite is a prototype for a much more performant solver I am planning to build in Rust.
 
-- Pyrite currently only supports **simply connected regions**, i.e., regions that have no "holes". This is an artifact of having a single list of vertices.
+- Pyrite currently only supports **simple connected regions**, i.e., regions that have no "holes". This is an artifact of having a single list of vertices.
 
 - Pyrite is only linear-elastic. Once stresses exceed the yield strength of the material, Pyrite will not accommodate plastic behavior
 
